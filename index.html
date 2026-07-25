@@ -363,6 +363,50 @@ html[data-mode="dark"] .badge-scheduled{ background:#152c38; color:#8fd1ea;}
 .fin-cat-pill{ font-size:.7rem; font-weight:700; padding:3px 9px; border-radius:999px; background:var(--accent-soft); color:var(--accent);}
 .fin-row-actions{ display:flex; gap:6px; justify-content:flex-end;}
 
+/* debts & loans */
+.debt-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px;}
+.debt-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; display:flex; flex-direction:column; gap:12px;}
+.debt-card.is-paid{ opacity:.6; }
+.debt-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px;}
+.debt-name{ font-family:var(--font-display); font-weight:600; font-size:1.08rem;}
+.debt-lender{ font-size:.72rem; color:var(--text-faint); text-transform:uppercase; letter-spacing:.05em; font-weight:700; margin-top:2px;}
+.debt-balance{ font-family:var(--font-display); font-size:1.6rem; font-weight:600; color:var(--danger);}
+.debt-balance.paid-off{ color:var(--success);}
+.debt-sub{ font-size:.76rem; color:var(--text-faint);}
+.debt-track{ height:8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); overflow:hidden;}
+.debt-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg,var(--success),var(--accent)); transition:width .4s ease;}
+.debt-meta-row{ display:flex; justify-content:space-between; font-size:.72rem; color:var(--text-faint); font-weight:700;}
+.debt-actions{ display:flex; gap:8px; border-top:1px dashed var(--border); padding-top:12px;}
+.badge-active-debt{ background:#F1DCD6; color:#B24A34;}
+.badge-paid-debt{ background:var(--accent-soft); color:var(--accent);}
+html[data-mode="dark"] .badge-active-debt{ background:#3a2119; color:#eba793;}
+
+/* savings & investments (mirrors debt cards) */
+.save-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:16px;}
+.save-card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; display:flex; flex-direction:column; gap:12px;}
+.save-card.is-done{ opacity:.7; }
+.save-amt{ font-family:var(--font-display); font-size:1.6rem; font-weight:600; color:var(--success);}
+.save-track{ height:8px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); overflow:hidden;}
+.save-fill{ height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent),var(--success)); transition:width .4s ease;}
+.badge-goal-active{ background:#DDEAF7; color:#2A6F97;}
+.badge-goal-done{ background:var(--accent-soft); color:var(--accent);}
+html[data-mode="dark"] .badge-goal-active{ background:#152c38; color:#8fd1ea;}
+
+/* insights */
+.insight-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); gap:16px; margin-bottom:16px;}
+.insight-card{ background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--accent); border-radius:var(--radius-md); padding:16px 18px; display:flex; gap:12px;}
+.insight-card.tone-warn{ border-left-color:var(--warning); }
+.insight-card.tone-danger{ border-left-color:var(--danger); }
+.insight-card.tone-good{ border-left-color:var(--success); }
+.insight-icon{ font-size:1.3rem; flex-shrink:0; line-height:1;}
+.insight-title{ font-weight:700; font-size:.9rem; margin-bottom:3px;}
+.insight-body{ font-size:.82rem; color:var(--text-muted); line-height:1.5;}
+.priority-list{ display:flex; flex-direction:column; gap:10px;}
+.priority-row{ display:flex; align-items:center; gap:12px; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-md);}
+.priority-rank{ width:26px; height:26px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.8rem; flex-shrink:0;}
+.priority-txt{ flex:1;} .priority-txt .pn{ font-weight:700; font-size:.86rem;} .priority-txt .ps{ font-size:.75rem; color:var(--text-faint);}
+.insight-toggle{ display:flex; gap:6px; margin-bottom:14px;}
+
 /* auth gate */
 .auth-gate{ position:fixed; inset:0; z-index:200; background:var(--bg); display:flex; align-items:center; justify-content:center; padding:20px;}
 .auth-card{ width:100%; max-width:400px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px 30px; box-shadow:var(--shadow-pop);}
@@ -458,6 +502,9 @@ html[data-mode="dark"] .badge-scheduled{ background:#152c38; color:#8fd1ea;}
       <button class="nav-item" data-view="timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h12M3 18h7"/><circle cx="19" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>Timeline</button>
       <button class="nav-item" data-view="social"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5 15.4 6.5M8.6 13.5 15.4 17.5"/></svg>Social</button>
       <button class="nav-item" data-view="finance"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Finance</button>
+      <button class="nav-item" data-view="debts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg>Debts</button>
+      <button class="nav-item" data-view="savings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10h4.5a1.5 1.5 0 0 1 0 3H10a1.5 1.5 0 0 0 0 3h4.5"/></svg>Savings</button>
+      <button class="nav-item" data-view="insights"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 3 14h8l-1 8 10-12h-8l1-8z"/></svg>Insights</button>
       <button class="nav-item" data-view="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Vault</button>
       <button class="nav-item" data-view="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 0 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 0 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 0 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 0 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>Settings</button>
     </nav>
@@ -573,6 +620,63 @@ html[data-mode="dark"] .badge-scheduled{ background:#152c38; color:#8fd1ea;}
         </div>
         <div style="overflow-x:auto;">
           <table class="fin-table" id="financeTable"></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEBTS & LOANS -->
+    <section class="view" id="view-debts">
+      <div class="topbar">
+        <div><div class="page-title">Debts &amp; Loans</div><div class="page-desc">Every loan and debt you owe, what's left, and what you've paid down.</div></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" id="downloadDebtTemplateBtn">Download CSV template</button>
+          <label class="btn btn-ghost" style="cursor:pointer;">Import CSV<input type="file" id="debtCsvInput" accept=".csv" style="display:none;"></label>
+          <button class="btn btn-primary" id="addDebtBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add debt / loan</button>
+        </div>
+      </div>
+      <div class="stat-grid" id="debtStatGrid"></div>
+      <div class="panel" style="margin-bottom:16px;">
+        <h3>Outstanding balance by debt</h3>
+        <div class="panel-sub">Where you still owe the most</div>
+        <div id="debtChartSlot"><canvas id="debtChart" height="200"></canvas></div>
+      </div>
+      <div class="filter-row" id="debtFilterRow"></div>
+      <div class="debt-grid" id="debtGrid"></div>
+    </section>
+
+    <!-- SAVINGS & INVESTMENTS -->
+    <section class="view" id="view-savings">
+      <div class="topbar">
+        <div><div class="page-title">Savings &amp; Investments</div><div class="page-desc">Goals you're building toward, and how close you are.</div></div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary" id="addSavingBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add goal</button>
+        </div>
+      </div>
+      <div class="stat-grid" id="savingStatGrid"></div>
+      <div class="filter-row" id="savingFilterRow"></div>
+      <div class="save-grid" id="savingGrid"></div>
+    </section>
+
+    <!-- INSIGHTS -->
+    <section class="view" id="view-insights">
+      <div class="topbar">
+        <div><div class="page-title">Insights</div><div class="page-desc">What your own numbers are telling you — calculated from your Finance, Debts, and Savings data, no AI guesswork involved.</div></div>
+      </div>
+      <div class="insight-grid" id="insightAlerts"></div>
+      <div class="chart-row">
+        <div class="panel">
+          <h3>Debt payoff priority</h3>
+          <div class="panel-sub">Which debt to attack first</div>
+          <div class="insight-toggle" id="strategyToggle">
+            <button class="chip active" data-s="avalanche">Avalanche (highest interest first)</button>
+            <button class="chip" data-s="snowball">Snowball (smallest balance first)</button>
+          </div>
+          <div class="priority-list" id="debtPriorityList"></div>
+        </div>
+        <div class="panel">
+          <h3>This month at a glance</h3>
+          <div class="panel-sub">Income, spending, and where it's going</div>
+          <div id="insightSummary"></div>
         </div>
       </div>
     </section>
@@ -825,6 +929,104 @@ html[data-mode="dark"] .badge-scheduled{ background:#152c38; color:#8fd1ea;}
   </div>
 </div>
 
+<!-- DEBT MODAL -->
+<div class="modal-backdrop" id="debtModalBackdrop">
+  <div class="modal">
+    <button class="close-x" data-close><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <h2 id="debtModalTitle">Add debt / loan</h2>
+    <form class="modal-form" id="debtForm">
+      <div class="field"><label>Name</label><input type="text" id="df-name" required placeholder="e.g. Car loan, GTBank personal loan"></div>
+      <div class="form-row2">
+        <div class="field"><label>Lender / source</label><input type="text" id="df-lender" placeholder="e.g. GTBank, Friend, Cooperative"></div>
+        <div class="field"><label>Type</label>
+          <select id="df-type"><option value="loan">Loan</option><option value="credit-card">Credit card</option><option value="personal-debt">Personal debt</option><option value="bnpl">Buy now, pay later</option><option value="other">Other</option></select>
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="field"><label>Original amount (₦)</label><input type="number" id="df-principal" min="0" step="1" required></div>
+        <div class="field"><label>Current balance owed (₦)</label><input type="number" id="df-balance" min="0" step="1" required></div>
+      </div>
+      <div class="form-row2">
+        <div class="field"><label>Interest rate (% per year, optional)</label><input type="number" id="df-interest" min="0" step="0.1"></div>
+        <div class="field"><label>Expected monthly payment (₦)</label><input type="number" id="df-monthly" min="0" step="1"></div>
+      </div>
+      <div class="form-row2">
+        <div class="field"><label>Date taken</label><input type="date" id="df-start"></div>
+        <div class="field"><label>Target payoff date</label><input type="date" id="df-target"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="df-notes" placeholder="Loan terms, account number, anything worth remembering"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger" id="deleteDebtBtn" style="display:none; margin-right:auto;">Delete</button>
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- LOG PAYMENT MODAL -->
+<div class="modal-backdrop" id="payDebtModalBackdrop">
+  <div class="modal" style="max-width:380px;">
+    <button class="close-x" data-close><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <h2>Log a payment</h2>
+    <div class="panel-sub" id="payDebtSub" style="margin-top:-8px;"></div>
+    <form class="modal-form" id="payDebtForm">
+      <div class="field"><label>Amount paid (₦)</label><input type="number" id="pd-amount" min="1" step="1" required></div>
+      <div class="field"><label>Date</label><input type="date" id="pd-date" required></div>
+      <div class="field" style="color:var(--text-faint); font-size:.78rem;">This also logs a "Debt Repayment" expense in your Finance ledger, so your totals stay accurate.</div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Log payment</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- SAVINGS GOAL MODAL -->
+<div class="modal-backdrop" id="savingModalBackdrop">
+  <div class="modal">
+    <button class="close-x" data-close><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <h2 id="savingModalTitle">Add goal</h2>
+    <form class="modal-form" id="savingForm">
+      <div class="field"><label>Goal name</label><input type="text" id="sv-name" required placeholder="e.g. Emergency fund, Land purchase, Mutual fund"></div>
+      <div class="form-row2">
+        <div class="field"><label>Category</label>
+          <select id="sv-category"><option value="emergency-fund">Emergency fund</option><option value="investment">Investment</option><option value="retirement">Retirement</option><option value="goal">Savings goal</option><option value="other">Other</option></select>
+        </div>
+        <div class="field"><label>Target date (optional)</label><input type="date" id="sv-target"></div>
+      </div>
+      <div class="form-row2">
+        <div class="field"><label>Target amount (₦)</label><input type="number" id="sv-targetamt" min="0" step="1" required></div>
+        <div class="field"><label>Already saved (₦)</label><input type="number" id="sv-current" min="0" step="1" required></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="sv-notes" placeholder="Where it's held, plan details, anything worth remembering"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-danger" id="deleteSavingBtn" style="display:none; margin-right:auto;">Delete</button>
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- LOG CONTRIBUTION MODAL -->
+<div class="modal-backdrop" id="contribModalBackdrop">
+  <div class="modal" style="max-width:380px;">
+    <button class="close-x" data-close><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    <h2>Log a contribution</h2>
+    <div class="panel-sub" id="contribSub" style="margin-top:-8px;"></div>
+    <form class="modal-form" id="contribForm">
+      <div class="field"><label>Amount added (₦)</label><input type="number" id="cb-amount" min="1" step="1" required></div>
+      <div class="field"><label>Date</label><input type="date" id="cb-date" required></div>
+      <div class="field" style="color:var(--text-faint); font-size:.78rem;">This also logs a "Savings &amp; Investments" expense in your Finance ledger — money moved isn't spent, but tracking the outflow keeps your ledger honest.</div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary">Log contribution</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1022,6 +1224,8 @@ function loginSuccess(){
   projects = loadProjects();
   socialPosts = loadSocial();
   financeEntries = loadFinance();
+  debts = loadDebts();
+  savingsGoals = loadSavings();
   generateRecurringEntries();
   refreshUserChrome();
   syncNotifToggle();
@@ -1030,7 +1234,7 @@ function loginSuccess(){
 
 function doLogout(){
   currentUser = null;
-  projects = []; socialPosts = []; financeEntries = [];
+  projects = []; socialPosts = []; financeEntries = []; debts = []; savingsGoals = [];
   vaultUnlockedKey = null; vaultEntries = [];
   clearTimeout(vaultAutoLockTimer);
   authTab = 'signin'; authView = 'signin'; authSelectedUser = null; authError = '';
@@ -1234,6 +1438,8 @@ function restoreFromTrash(trashId){
   if(entry.type==='project'){ projects.push(entry.item); saveProjects(); }
   if(entry.type==='social'){ socialPosts.push(entry.item); saveSocial(); }
   if(entry.type==='finance'){ financeEntries.push(entry.item); saveFinance(); }
+  if(entry.type==='debt'){ debts.push(entry.item); saveDebts(); }
+  if(entry.type==='saving'){ savingsGoals.push(entry.item); saveSavings(); }
   saveTrash(trash.filter(t=>t.trashId!==trashId));
   renderAll(); renderTrashPanel();
   toast('Restored 🌱');
@@ -1246,8 +1452,8 @@ function renderTrashPanel(){
   const el = $('#trashPanel'); if(!el) return;
   purgeOldTrash();
   const trash = loadTrash();
-  const typeLabel = {project:'Project', social:'Social post', finance:'Finance entry'};
-  const nameOf = t => t.type==='project' ? t.item.name : t.type==='social' ? t.item.title : (t.item.category+' — '+naira(t.item.amount));
+  const typeLabel = {project:'Project', social:'Social post', finance:'Finance entry', debt:'Debt / loan', saving:'Savings goal'};
+  const nameOf = t => t.type==='project' ? t.item.name : t.type==='social' ? t.item.title : (t.type==='debt'||t.type==='saving') ? t.item.name : (t.item.category+' — '+naira(t.item.amount));
   el.innerHTML = trash.length ? trash.map(t=>`
     <div class="settings-row">
       <div><div class="t">${escapeHtml(nameOf(t))}</div><div class="d">${typeLabel[t.type]} · deleted ${timeAgo(t.deletedAt)} · auto-purges after 30 days</div></div>
@@ -1276,7 +1482,7 @@ async function pushToCloud(silent){
   const cfg = loadSyncConfig();
   if(!cfg.url || !cfg.anonKey || !cfg.syncId) return;
   try{
-    const payload = { projects, socialPosts, financeEntries };
+    const payload = { projects, socialPosts, financeEntries, debts, savingsGoals };
     await supabaseRequest(cfg, 'POST', 'canopy_sync', [{ sync_id:cfg.syncId, payload, updated_at:new Date().toISOString() }]);
     cfg.lastSyncedAt = new Date().toISOString();
     saveSyncConfig(cfg);
@@ -1294,9 +1500,13 @@ async function pullFromCloud(){
     projects = payload.projects || [];
     socialPosts = payload.socialPosts || [];
     financeEntries = payload.financeEntries || [];
+    debts = payload.debts || [];
+    savingsGoals = payload.savingsGoals || [];
     localStorage.setItem(userKey('canopy_projects'), JSON.stringify(projects));
     localStorage.setItem(userKey('canopy_social'), JSON.stringify(socialPosts));
     localStorage.setItem(userKey('canopy_finance'), JSON.stringify(financeEntries));
+    localStorage.setItem(userKey('canopy_debts'), JSON.stringify(debts));
+    localStorage.setItem(userKey('canopy_savings'), JSON.stringify(savingsGoals));
     cfg.lastSyncedAt = new Date().toISOString();
     saveSyncConfig(cfg);
     renderAll();
@@ -1418,6 +1628,9 @@ function switchView(view){
   if(view==='timeline') safeRun(renderTimeline);
   if(view==='social') safeRun(renderSocial);
   if(view==='finance') safeRun(renderFinance);
+  if(view==='debts') safeRun(renderDebts);
+  if(view==='savings') safeRun(renderSavings);
+  if(view==='insights') safeRun(renderInsights);
   if(view==='settings'){ safeRun(renderTrashPanel); safeRun(renderSyncArea); }
 }
 $$('.nav-item').forEach(btn=>{
@@ -1439,11 +1652,14 @@ function runGlobalSearch(qRaw){
   const financeMatches = financeEntries.filter(f=>
     (f.category||'').toLowerCase().includes(q) || (f.note||'').toLowerCase().includes(q) || (f.project||'').toLowerCase().includes(q)
   ).slice(0,6);
+  const debtMatches = debts.filter(d=>
+    (d.name||'').toLowerCase().includes(q) || (d.lender||'').toLowerCase().includes(q) || (d.notes||'').toLowerCase().includes(q)
+  ).slice(0,6);
   const vaultMatches = vaultUnlockedKey
     ? vaultEntries.filter(c=> (c.service||'').toLowerCase().includes(q) || (c.username||'').toLowerCase().includes(q)).slice(0,6)
     : [];
 
-  const total = projMatches.length + socialMatches.length + financeMatches.length + vaultMatches.length;
+  const total = projMatches.length + socialMatches.length + financeMatches.length + debtMatches.length + vaultMatches.length;
   if(!total){
     box.innerHTML = `<div class="search-empty">No matches for "${escapeHtml(qRaw)}"${!vaultUnlockedKey?' (unlock the Vault to include credentials)':''}</div>`;
     box.classList.add('show');
@@ -1463,6 +1679,10 @@ function runGlobalSearch(qRaw){
     html += `<div class="search-group-label">Finance</div>`;
     html += financeMatches.map(f=>`<div class="search-result-item" onclick="jumpToFinance('${f.id}')"><div class="srt">${escapeHtml(f.category)} — ${naira(f.amount)}</div><div class="srs">${escapeHtml(f.note||f.project||'')}</div></div>`).join('');
   }
+  if(debtMatches.length){
+    html += `<div class="search-group-label">Debts</div>`;
+    html += debtMatches.map(d=>`<div class="search-result-item" onclick="jumpToDebt('${d.id}')"><div class="srt">${escapeHtml(d.name)}</div><div class="srs">${escapeHtml(d.lender||'')} · ${naira(d.balance)} owed</div></div>`).join('');
+  }
   if(vaultMatches.length){
     html += `<div class="search-group-label">Vault</div>`;
     html += vaultMatches.map(c=>`<div class="search-result-item" onclick="jumpToVault('${c.id}')"><div class="srt">${escapeHtml(c.service)}</div><div class="srs">${escapeHtml(c.username||'')}</div></div>`).join('');
@@ -1474,6 +1694,7 @@ function closeSearchResults(){ $('#searchResults').classList.remove('show'); }
 function jumpToProject(id){ switchView('projects'); closeSearchResults(); $('#globalSearchInput').value=''; openProjectModal(id); }
 function jumpToSocial(id){ switchView('social'); closeSearchResults(); $('#globalSearchInput').value=''; openSocialModal(id); }
 function jumpToFinance(id){ switchView('finance'); closeSearchResults(); $('#globalSearchInput').value=''; openFinanceModal(id); }
+function jumpToDebt(id){ switchView('debts'); closeSearchResults(); $('#globalSearchInput').value=''; openDebtModal(id); }
 function jumpToVault(id){ switchView('vault'); closeSearchResults(); $('#globalSearchInput').value=''; openCredModal(id); }
 $('#globalSearchInput').addEventListener('input', (e)=> runGlobalSearch(e.target.value));
 $('#globalSearchInput').addEventListener('focus', (e)=>{ if(e.target.value) runGlobalSearch(e.target.value); });
@@ -1956,8 +2177,8 @@ $('#deleteSocialBtn').onclick = ()=>{
 };
 
 /* ============ FINANCE / EXPENSE MANAGER ============ */
-const INCOME_CATS = ['Salary','Blog Ad Revenue','YouTube Revenue','Freelance','Other Income'];
-const EXPENSE_CATS = ['Rent / Mortgage','Utilities (Electricity/Water)','Groceries & Feeding','Data & Airtime','Transport','Family & Dependents','Medical / Health','Home Maintenance','Hosting & Domains','Software / Subscriptions','Content Production','Ads / Boosting','Equipment','Other Expense'];
+const INCOME_CATS = ['Salary','Business Income','Blog Ad Revenue','YouTube Revenue','Freelance / Side Hustle','Rental Income','Investment Returns','Loan Received','Gifts / Support Received','Other Income'];
+const EXPENSE_CATS = ['Rent / Mortgage','Utilities (Electricity/Water)','Groceries & Feeding','Data & Airtime','Transport / Fuel','Family & Dependents','Medical / Health','Insurance','Education / School Fees','Home Maintenance','Clothing & Personal Care','Entertainment & Leisure','Savings & Investments','Taxes','Debt Repayment','Bank Charges & Fees','Hosting & Domains','Software / Subscriptions','Content Production','Ads / Boosting','Equipment','Other Expense'];
 const SEED_FINANCE = [
   {id:cryptoId(), type:'income', amount:45000, category:'Blog Ad Revenue', date:daysAgoDate(20), project:'NaijaToday', note:'Monetag payout'},
   {id:cryptoId(), type:'expense', amount:15000, category:'Hosting & Domains', date:daysAgoDate(25), project:'NaijaToday', note:'Domain renewal'},
@@ -2154,6 +2375,439 @@ $('#deleteFinanceBtn').onclick = ()=>{
     });
   }
 };
+
+/* ============ DEBTS & LOANS ============ */
+let debts = [];
+let debtFilter = 'all';
+let editingDebtId = null;
+let payingDebtId = null;
+function loadDebts(){
+  try{ const raw = localStorage.getItem(userKey('canopy_debts')); if(raw) return JSON.parse(raw); }catch(e){}
+  return [];
+}
+function saveDebts(){ localStorage.setItem(userKey('canopy_debts'), JSON.stringify(debts)); maybeAutoSync(); }
+
+let debtChartInst;
+function renderDebts(){
+  const active = debts.filter(d=>d.status!=='paid-off');
+  const totalOwed = active.reduce((s,d)=>s+Number(d.balance||0),0);
+  const totalMonthly = active.reduce((s,d)=>s+Number(d.monthlyPayment||0),0);
+  const totalPaidOff = debts.filter(d=>d.status==='paid-off').length;
+  $('#debtStatGrid').innerHTML = `
+    <div class="stat-card"><div class="num" style="color:var(--danger)">${naira(totalOwed)}</div><div class="lbl">Total owed</div></div>
+    <div class="stat-card"><div class="num">${naira(totalMonthly)}</div><div class="lbl">Monthly obligations</div></div>
+    <div class="stat-card"><div class="num">${active.length}</div><div class="lbl">Active debts</div></div>
+    <div class="stat-card"><div class="num">${totalPaidOff}</div><div class="lbl">Paid off</div></div>
+  `;
+
+  const styles = getComputedStyle(document.documentElement);
+  const danger = styles.getPropertyValue('--danger').trim();
+  const textMuted = styles.getPropertyValue('--text-muted').trim();
+  const border = styles.getPropertyValue('--border').trim();
+  try{
+    if(debtChartInst) debtChartInst.destroy();
+    const canvas = ensureCanvas('debtChartSlot','debtChart',200);
+    if(canvas && active.length){
+      debtChartInst = new Chart(canvas, {
+        type:'bar',
+        data:{ labels:active.map(d=>d.name), datasets:[{ data:active.map(d=>Number(d.balance||0)), backgroundColor:danger, borderRadius:8, barThickness:16 }]},
+        options:{ indexAxis:'y', plugins:{legend:{display:false}},
+          scales:{ x:{grid:{color:border}, ticks:{color:textMuted, callback:v=>'₦'+(v/1000)+'k'}}, y:{grid:{display:false}, ticks:{color:textMuted, font:{size:11}}} } }
+      });
+    } else if(canvas){
+      canvas.parentElement.innerHTML = `<div class="empty-state" style="padding:30px;">No active debts to chart.</div>`;
+    }
+  }catch(e){ console.error('Chart.js unavailable for debt chart', e); }
+
+  const statuses = ['all','active','paid-off'];
+  $('#debtFilterRow').innerHTML = statuses.map(s=>`<button class="chip ${debtFilter===s?'active':''}" data-f="${s}">${s==='all'?'All':s==='active'?'Active':'Paid off'}</button>`).join('');
+  $$('#debtFilterRow .chip').forEach(c=> c.onclick = ()=>{ debtFilter=c.dataset.f; renderDebts(); });
+
+  const list = debtFilter==='all' ? debts : debtFilter==='active' ? debts.filter(d=>d.status!=='paid-off') : debts.filter(d=>d.status==='paid-off');
+  $('#debtGrid').innerHTML = list.length ? list.map(d=>{
+    const paidSoFar = Math.max(0, Number(d.principal||0) - Number(d.balance||0));
+    const pct = d.principal>0 ? Math.min(100, Math.round(paidSoFar/Number(d.principal)*100)) : 0;
+    const isPaid = d.status==='paid-off';
+    return `
+    <div class="debt-card ${isPaid?'is-paid':''}">
+      <div class="debt-top">
+        <div><div class="debt-name">${escapeHtml(d.name)}</div><div class="debt-lender">${escapeHtml(d.lender||'—')}</div></div>
+        <span class="badge ${isPaid?'badge-paid-debt':'badge-active-debt'}">${isPaid?'Paid off':'Active'}</span>
+      </div>
+      <div>
+        <div class="debt-balance ${isPaid?'paid-off':''}">${naira(d.balance)}</div>
+        <div class="debt-sub">of ${naira(d.principal)} original${d.interestRate?` · ${d.interestRate}% /yr`:''}</div>
+      </div>
+      <div>
+        <div class="debt-track"><div class="debt-fill" style="width:${pct}%"></div></div>
+        <div class="debt-meta-row" style="margin-top:6px;"><span>${pct}% paid off</span>${d.monthlyPayment?`<span>${naira(d.monthlyPayment)}/mo</span>`:''}</div>
+      </div>
+      <div class="debt-actions">
+        ${!isPaid?`<button class="btn btn-primary" style="flex:1; justify-content:center;" onclick="openPayDebtModal('${d.id}')">Log payment</button>`:''}
+        <button class="btn btn-ghost" style="${isPaid?'flex:1; justify-content:center;':''}" onclick="openDebtModal('${d.id}')">Edit</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty-state">No debts in this view. ${debts.length?'':'Click "Add debt / loan" to start tracking one.'}</div>`;
+}
+
+function openDebtModal(id){
+  editingDebtId = id;
+  const d = id ? debts.find(x=>x.id===id) : null;
+  $('#debtModalTitle').textContent = d ? 'Edit debt / loan' : 'Add debt / loan';
+  $('#df-name').value = d? d.name : '';
+  $('#df-lender').value = d? (d.lender||'') : '';
+  $('#df-type').value = d? d.type : 'loan';
+  $('#df-principal').value = d? d.principal : '';
+  $('#df-balance').value = d? d.balance : '';
+  $('#df-interest').value = d? (d.interestRate||'') : '';
+  $('#df-monthly').value = d? (d.monthlyPayment||'') : '';
+  $('#df-start').value = d? (d.startDate||'') : '';
+  $('#df-target').value = d? (d.targetDate||'') : '';
+  $('#df-notes').value = d? (d.notes||'') : '';
+  $('#deleteDebtBtn').style.display = d ? 'inline-flex' : 'none';
+  $('#debtModalBackdrop').classList.add('active');
+}
+$('#addDebtBtn').onclick = ()=> openDebtModal(null);
+$('#debtForm').onsubmit = (e)=>{
+  e.preventDefault();
+  const principal = parseFloat($('#df-principal').value)||0;
+  const balance = parseFloat($('#df-balance').value)||0;
+  const data = {
+    name: $('#df-name').value.trim(), lender: $('#df-lender').value.trim(), type: $('#df-type').value,
+    principal, balance, interestRate: parseFloat($('#df-interest').value)||null,
+    monthlyPayment: parseFloat($('#df-monthly').value)||null,
+    startDate: $('#df-start').value||null, targetDate: $('#df-target').value||null,
+    notes: $('#df-notes').value.trim(),
+    status: balance<=0 ? 'paid-off' : 'active',
+    updated: new Date().toISOString()
+  };
+  if(editingDebtId){
+    const idx = debts.findIndex(x=>x.id===editingDebtId);
+    debts[idx] = {...debts[idx], ...data};
+    toast('Debt updated');
+  } else {
+    debts.push({id:cryptoId(), ...data});
+    toast('Debt added');
+  }
+  saveDebts(); closeModals(); renderDebts();
+};
+$('#deleteDebtBtn').onclick = ()=>{
+  if(!editingDebtId) return;
+  const removed = debts.find(x=>x.id===editingDebtId);
+  debts = debts.filter(x=>x.id!==editingDebtId);
+  saveDebts(); closeModals(); renderDebts();
+  if(removed){
+    moveToTrash('debt', removed);
+    toast('Debt moved to trash', 'Undo', ()=>{
+      const trash = loadTrash();
+      const entry = trash.find(t=>t.item.id===removed.id && t.type==='debt');
+      if(entry) restoreFromTrash(entry.trashId);
+    });
+  }
+};
+
+function openPayDebtModal(id){
+  payingDebtId = id;
+  const d = debts.find(x=>x.id===id);
+  if(!d) return;
+  $('#payDebtSub').textContent = `${d.name} — currently ${naira(d.balance)} owed`;
+  $('#pd-amount').value = d.monthlyPayment || '';
+  $('#pd-date').value = new Date().toISOString().slice(0,10);
+  $('#payDebtModalBackdrop').classList.add('active');
+}
+$('#payDebtForm').onsubmit = (e)=>{
+  e.preventDefault();
+  const d = debts.find(x=>x.id===payingDebtId);
+  if(!d) return;
+  const amount = parseFloat($('#pd-amount').value)||0;
+  const date = $('#pd-date').value;
+  d.balance = Math.max(0, Number(d.balance) - amount);
+  if(d.balance<=0) d.status='paid-off';
+  d.updated = new Date().toISOString();
+  saveDebts();
+  financeEntries.push({ id:cryptoId(), type:'expense', amount, category:'Debt Repayment', date,
+    project:'', note:`Payment toward ${d.name}`, isRecurring:false, recurringSourceId:null });
+  saveFinance();
+  closeModals(); renderDebts();
+  toast(d.status==='paid-off' ? `${d.name} fully paid off! 🎉` : 'Payment logged');
+};
+/* ============ SAVINGS & INVESTMENTS ============ */
+let savingsGoals = [];
+let savingFilter = 'all';
+let editingSavingId = null;
+let contribGoalId = null;
+function loadSavings(){
+  try{ const raw = localStorage.getItem(userKey('canopy_savings')); if(raw) return JSON.parse(raw); }catch(e){}
+  return [];
+}
+function saveSavings(){ localStorage.setItem(userKey('canopy_savings'), JSON.stringify(savingsGoals)); maybeAutoSync(); }
+
+function renderSavings(){
+  const active = savingsGoals.filter(g=>g.status!=='completed');
+  const totalSaved = savingsGoals.reduce((s,g)=>s+Number(g.current||0),0);
+  const totalTarget = active.reduce((s,g)=>s+Number(g.targetAmount||0),0);
+  const completed = savingsGoals.filter(g=>g.status==='completed').length;
+  $('#savingStatGrid').innerHTML = `
+    <div class="stat-card"><div class="num" style="color:var(--success)">${naira(totalSaved)}</div><div class="lbl">Total saved</div></div>
+    <div class="stat-card"><div class="num">${naira(totalTarget)}</div><div class="lbl">Active goal targets</div></div>
+    <div class="stat-card"><div class="num">${active.length}</div><div class="lbl">Active goals</div></div>
+    <div class="stat-card"><div class="num">${completed}</div><div class="lbl">Goals reached</div></div>
+  `;
+  const statuses = ['all','active','completed'];
+  $('#savingFilterRow').innerHTML = statuses.map(s=>`<button class="chip ${savingFilter===s?'active':''}" data-f="${s}">${s==='all'?'All':s==='active'?'Active':'Completed'}</button>`).join('');
+  $$('#savingFilterRow .chip').forEach(c=> c.onclick = ()=>{ savingFilter=c.dataset.f; renderSavings(); });
+
+  const catLabel = {'emergency-fund':'Emergency fund','investment':'Investment','retirement':'Retirement','goal':'Savings goal','other':'Other'};
+  const list = savingFilter==='all' ? savingsGoals : savingFilter==='active' ? savingsGoals.filter(g=>g.status!=='completed') : savingsGoals.filter(g=>g.status==='completed');
+  $('#savingGrid').innerHTML = list.length ? list.map(g=>{
+    const pct = g.targetAmount>0 ? Math.min(100, Math.round(Number(g.current||0)/Number(g.targetAmount)*100)) : 0;
+    const isDone = g.status==='completed';
+    return `
+    <div class="save-card ${isDone?'is-done':''}">
+      <div class="debt-top">
+        <div><div class="debt-name">${escapeHtml(g.name)}</div><div class="debt-lender">${catLabel[g.category]||'Goal'}</div></div>
+        <span class="badge ${isDone?'badge-goal-done':'badge-goal-active'}">${isDone?'Reached':'Active'}</span>
+      </div>
+      <div>
+        <div class="save-amt">${naira(g.current)}</div>
+        <div class="debt-sub">of ${naira(g.targetAmount)} target${g.targetDate?` · by ${new Date(g.targetDate).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'})}`:''}</div>
+      </div>
+      <div>
+        <div class="save-track"><div class="save-fill" style="width:${pct}%"></div></div>
+        <div class="debt-meta-row" style="margin-top:6px;"><span>${pct}% reached</span></div>
+      </div>
+      <div class="debt-actions">
+        ${!isDone?`<button class="btn btn-primary" style="flex:1; justify-content:center;" onclick="openContribModal('${g.id}')">Log contribution</button>`:''}
+        <button class="btn btn-ghost" style="${isDone?'flex:1; justify-content:center;':''}" onclick="openSavingModal('${g.id}')">Edit</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty-state">No goals in this view. ${savingsGoals.length?'':'Click "Add goal" to start one — an emergency fund is usually the best place to begin.'}</div>`;
+}
+function openSavingModal(id){
+  editingSavingId = id;
+  const g = id ? savingsGoals.find(x=>x.id===id) : null;
+  $('#savingModalTitle').textContent = g ? 'Edit goal' : 'Add goal';
+  $('#sv-name').value = g? g.name : '';
+  $('#sv-category').value = g? g.category : 'emergency-fund';
+  $('#sv-target').value = g? (g.targetDate||'') : '';
+  $('#sv-targetamt').value = g? g.targetAmount : '';
+  $('#sv-current').value = g? g.current : '';
+  $('#sv-notes').value = g? (g.notes||'') : '';
+  $('#deleteSavingBtn').style.display = g ? 'inline-flex' : 'none';
+  $('#savingModalBackdrop').classList.add('active');
+}
+$('#addSavingBtn').onclick = ()=> openSavingModal(null);
+$('#savingForm').onsubmit = (e)=>{
+  e.preventDefault();
+  const targetAmount = parseFloat($('#sv-targetamt').value)||0;
+  const current = parseFloat($('#sv-current').value)||0;
+  const data = {
+    name: $('#sv-name').value.trim(), category: $('#sv-category').value,
+    targetDate: $('#sv-target').value||null, targetAmount, current,
+    notes: $('#sv-notes').value.trim(),
+    status: (targetAmount>0 && current>=targetAmount) ? 'completed' : 'active',
+    updated: new Date().toISOString()
+  };
+  if(editingSavingId){
+    const idx = savingsGoals.findIndex(x=>x.id===editingSavingId);
+    savingsGoals[idx] = {...savingsGoals[idx], ...data};
+    toast('Goal updated');
+  } else {
+    savingsGoals.push({id:cryptoId(), ...data});
+    toast('Goal added');
+  }
+  saveSavings(); closeModals(); renderSavings();
+};
+$('#deleteSavingBtn').onclick = ()=>{
+  if(!editingSavingId) return;
+  const removed = savingsGoals.find(x=>x.id===editingSavingId);
+  savingsGoals = savingsGoals.filter(x=>x.id!==editingSavingId);
+  saveSavings(); closeModals(); renderSavings();
+  if(removed){
+    moveToTrash('saving', removed);
+    toast('Goal moved to trash', 'Undo', ()=>{
+      const trash = loadTrash();
+      const entry = trash.find(t=>t.item.id===removed.id && t.type==='saving');
+      if(entry) restoreFromTrash(entry.trashId);
+    });
+  }
+};
+function openContribModal(id){
+  contribGoalId = id;
+  const g = savingsGoals.find(x=>x.id===id);
+  if(!g) return;
+  $('#contribSub').textContent = `${g.name} — ${naira(g.current)} of ${naira(g.targetAmount)} so far`;
+  $('#cb-amount').value = '';
+  $('#cb-date').value = new Date().toISOString().slice(0,10);
+  $('#contribModalBackdrop').classList.add('active');
+}
+$('#contribForm').onsubmit = (e)=>{
+  e.preventDefault();
+  const g = savingsGoals.find(x=>x.id===contribGoalId);
+  if(!g) return;
+  const amount = parseFloat($('#cb-amount').value)||0;
+  const date = $('#cb-date').value;
+  g.current = Number(g.current) + amount;
+  if(g.targetAmount>0 && g.current>=g.targetAmount) g.status='completed';
+  g.updated = new Date().toISOString();
+  saveSavings();
+  financeEntries.push({ id:cryptoId(), type:'expense', amount, category:'Savings & Investments', date,
+    project:'', note:`Contribution to ${g.name}`, isRecurring:false, recurringSourceId:null });
+  saveFinance();
+  closeModals(); renderSavings();
+  toast(g.status==='completed' ? `${g.name} goal reached! 🎉` : 'Contribution logged');
+};
+
+/* ---------- CSV import for old loans (Debts) ---------- */
+function parseCsv(text){
+  const rows = []; let row=[]; let field=''; let inQuotes=false;
+  for(let i=0;i<text.length;i++){
+    const c = text[i];
+    if(inQuotes){
+      if(c==='"'){ if(text[i+1]==='"'){ field+='"'; i++; } else inQuotes=false; }
+      else field+=c;
+    } else {
+      if(c==='"') inQuotes=true;
+      else if(c===','){ row.push(field); field=''; }
+      else if(c==='\n' || c==='\r'){
+        if(c==='\r' && text[i+1]==='\n') i++;
+        row.push(field); field=''; rows.push(row); row=[];
+      } else field+=c;
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r=> r.some(c=>c.trim()!==''));
+}
+$('#downloadDebtTemplateBtn').onclick = ()=>{
+  const csv = 'name,lender,type,principal,balance,interestRate,monthlyPayment,startDate,targetDate,notes\n'
+    + 'Car loan,GTBank,loan,2000000,1200000,18,85000,2025-03-01,2027-03-01,36-month auto loan\n';
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='canopy-debts-template.csv'; a.click();
+  URL.revokeObjectURL(url);
+};
+$('#debtCsvInput').onchange = (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const rows = parseCsv(reader.result);
+      if(!rows.length){ toast('That CSV looks empty'); return; }
+      const headers = rows[0].map(h=>h.trim().toLowerCase());
+      const idx = (name)=> headers.indexOf(name);
+      let added = 0;
+      for(let i=1;i<rows.length;i++){
+        const r = rows[i];
+        const name = idx('name')>=0 ? r[idx('name')]?.trim() : '';
+        if(!name) continue;
+        const principal = parseFloat(r[idx('principal')])||0;
+        const balance = idx('balance')>=0 ? (parseFloat(r[idx('balance')])||0) : principal;
+        debts.push({
+          id: cryptoId(), name,
+          lender: idx('lender')>=0 ? (r[idx('lender')]||'').trim() : '',
+          type: idx('type')>=0 && r[idx('type')] ? r[idx('type')].trim() : 'loan',
+          principal, balance,
+          interestRate: idx('interestrate')>=0 ? (parseFloat(r[idx('interestrate')])||null) : null,
+          monthlyPayment: idx('monthlypayment')>=0 ? (parseFloat(r[idx('monthlypayment')])||null) : null,
+          startDate: idx('startdate')>=0 ? (r[idx('startdate')]||null) : null,
+          targetDate: idx('targetdate')>=0 ? (r[idx('targetdate')]||null) : null,
+          notes: idx('notes')>=0 ? (r[idx('notes')]||'').trim() : '',
+          status: balance<=0 ? 'paid-off' : 'active',
+          updated: new Date().toISOString()
+        });
+        added++;
+      }
+      saveDebts(); renderDebts();
+      toast(added ? `Imported ${added} loan${added>1?'s':''}` : 'No valid rows found — check the "name" column exists');
+    }catch(err){ toast('Could not read that CSV — try the template'); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
+};
+
+/* ============ INSIGHTS (rule-based, computed from your own data — no AI calls) ============ */
+let debtStrategy = 'avalanche';
+$$('#strategyToggle .chip').forEach(c=> c.onclick = ()=>{ debtStrategy=c.dataset.s; $$('#strategyToggle .chip').forEach(x=>x.classList.toggle('active', x===c)); renderInsights(); });
+
+function monthTotals(monthsBack){
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth()-monthsBack, 1);
+  const income = financeEntries.filter(f=>f.type==='income' && new Date(f.date).getFullYear()===target.getFullYear() && new Date(f.date).getMonth()===target.getMonth()).reduce((s,f)=>s+Number(f.amount),0);
+  const expense = financeEntries.filter(f=>f.type==='expense' && new Date(f.date).getFullYear()===target.getFullYear() && new Date(f.date).getMonth()===target.getMonth()).reduce((s,f)=>s+Number(f.amount),0);
+  return {income, expense};
+}
+function renderInsights(){
+  const thisMonth = monthTotals(0);
+  const last3 = [monthTotals(0), monthTotals(1), monthTotals(2)];
+  const avgIncome3 = last3.reduce((s,m)=>s+m.income,0)/3;
+  const avgExpense3 = last3.reduce((s,m)=>s+m.expense,0)/3;
+  const savingsRate = thisMonth.income>0 ? (thisMonth.income-thisMonth.expense)/thisMonth.income : null;
+  const activeDebts = debts.filter(d=>d.status!=='paid-off');
+  const totalMonthlyDebtPayments = activeDebts.reduce((s,d)=>s+Number(d.monthlyPayment||0),0);
+  const debtToIncome = thisMonth.income>0 ? totalMonthlyDebtPayments/thisMonth.income : (totalMonthlyDebtPayments>0 ? 1 : 0);
+  const totalDebtOwed = activeDebts.reduce((s,d)=>s+Number(d.balance||0),0);
+
+  const catTotalsThisMonth = {};
+  financeEntries.filter(f=>f.type==='expense' && new Date(f.date).getMonth()===new Date().getMonth() && new Date(f.date).getFullYear()===new Date().getFullYear())
+    .forEach(f=> catTotalsThisMonth[f.category] = (catTotalsThisMonth[f.category]||0) + Number(f.amount));
+  const topCats = Object.entries(catTotalsThisMonth).sort((a,b)=>b[1]-a[1]).slice(0,3);
+
+  const alerts = [];
+  if(activeDebts.length===0 && debts.length===0){
+    alerts.push({tone:'good', icon:'🌱', title:'No debts tracked yet', body:'Once you add your loans in the Debts tab, this page will tell you which to prioritize paying off and how they affect your monthly budget.'});
+  }
+  if(debtToIncome > 0.4){
+    alerts.push({tone:'danger', icon:'⚠️', title:'Debt payments are a large share of income', body:`Your monthly debt obligations (${naira(totalMonthlyDebtPayments)}) are about ${Math.round(debtToIncome*100)}% of this month's income. Many lenders view above 35–40% as high risk — worth avoiding new borrowing until this comes down.`});
+  } else if(debtToIncome > 0.25){
+    alerts.push({tone:'warn', icon:'📊', title:'Debt-to-income is worth watching', body:`Debt payments are about ${Math.round(debtToIncome*100)}% of this month's income. Not alarming, but keep it from creeping higher.`});
+  } else if(totalMonthlyDebtPayments>0){
+    alerts.push({tone:'good', icon:'✅', title:'Debt load looks manageable', body:`Debt payments are about ${Math.round(debtToIncome*100)}% of this month's income — comfortably under common risk thresholds.`});
+  }
+  if(savingsRate!==null){
+    if(savingsRate < 0){
+      alerts.push({tone:'danger', icon:'🔻', title:'Spending more than you earned this month', body:`Expenses (${naira(thisMonth.expense)}) outpaced income (${naira(thisMonth.income)}) this month. Worth a closer look at where it went.`});
+    } else if(savingsRate < 0.1){
+      alerts.push({tone:'warn', icon:'💡', title:'Savings rate is thin this month', body:`You kept about ${Math.round(savingsRate*100)}% of what came in. A common target is 15–20% if your expenses allow it.`});
+    } else {
+      alerts.push({tone:'good', icon:'💪', title:'Solid savings rate this month', body:`You kept about ${Math.round(savingsRate*100)}% of this month's income — ahead of the typical 15–20% guideline.`});
+    }
+  }
+  const highInterestDebt = activeDebts.filter(d=>d.interestRate).sort((a,b)=>b.interestRate-a.interestRate)[0];
+  if(highInterestDebt && highInterestDebt.interestRate >= 20){
+    alerts.push({tone:'warn', icon:'🔥', title:`${highInterestDebt.name} carries high interest`, body:`At ${highInterestDebt.interestRate}%/yr, this is likely your most expensive debt to leave outstanding — prioritizing it (see the payoff list) typically saves the most over time.`});
+  }
+  if(topCats.length){
+    alerts.push({tone:'', icon:'📌', title:'Biggest expense category this month', body:`${topCats[0][0]}: ${naira(topCats[0][1])}${topCats[1]?`, followed by ${topCats[1][0]} (${naira(topCats[1][1])})`:''}.`});
+  }
+  if(savingsGoals.filter(g=>g.status!=='completed').length===0 && savingsGoals.length===0){
+    alerts.push({tone:'', icon:'🎯', title:'No savings goals set yet', body:`A good first goal for most people is an emergency fund covering 3–6 months of essential expenses (${thisMonth.expense>0 ? 'around '+naira(thisMonth.expense*3)+'–'+naira(thisMonth.expense*6)+' based on this month\'s spending' : 'once you have a typical month logged'}).`});
+  }
+
+  $('#insightAlerts').innerHTML = alerts.length ? alerts.map(a=>`
+    <div class="insight-card ${a.tone?'tone-'+a.tone:''}">
+      <div class="insight-icon">${a.icon}</div>
+      <div><div class="insight-title">${escapeHtml(a.title)}</div><div class="insight-body">${a.body}</div></div>
+    </div>`).join('') : `<div class="empty-state">Add some income, expenses, and debts to start seeing insights here.</div>`;
+
+  const sorted = [...activeDebts].sort((a,b)=> debtStrategy==='avalanche'
+    ? (Number(b.interestRate||0) - Number(a.interestRate||0))
+    : (Number(a.balance||0) - Number(b.balance||0)));
+  $('#debtPriorityList').innerHTML = sorted.length ? sorted.map((d,i)=>`
+    <div class="priority-row">
+      <div class="priority-rank">${i+1}</div>
+      <div class="priority-txt"><div class="pn">${escapeHtml(d.name)}</div><div class="ps">${naira(d.balance)} owed${d.interestRate?` · ${d.interestRate}%/yr`:' · rate not set'}</div></div>
+      <button class="btn btn-ghost" style="padding:6px 12px; font-size:.75rem;" onclick="switchView('debts')">View</button>
+    </div>`).join('') : `<div class="empty-state" style="padding:20px;">No active debts to prioritize — nice.</div>`;
+
+  $('#insightSummary').innerHTML = `
+    <div class="settings-row"><div class="t">Income this month</div><div style="font-weight:700; color:var(--success);">${naira(thisMonth.income)}</div></div>
+    <div class="settings-row"><div class="t">Expenses this month</div><div style="font-weight:700; color:var(--danger);">${naira(thisMonth.expense)}</div></div>
+    <div class="settings-row"><div class="t">Net this month</div><div style="font-weight:700;">${naira(thisMonth.income-thisMonth.expense)}</div></div>
+    <div class="settings-row"><div class="t">3-month avg income</div><div style="font-weight:700;">${naira(avgIncome3)}</div></div>
+    <div class="settings-row"><div class="t">3-month avg expenses</div><div style="font-weight:700;">${naira(avgExpense3)}</div></div>
+    <div class="settings-row"><div class="t">Total debt owed</div><div style="font-weight:700; color:var(--danger);">${naira(totalDebtOwed)}</div></div>
+  `;
+}
 
 /* ============ VAULT (encrypted) ============ */
 function VAULT_KEY(){ return userKey('canopy_vault_blob'); }
@@ -2430,7 +3084,7 @@ document.addEventListener('click', (e)=>{ if(!e.target.closest('.bell-wrap')) $(
 
 /* ============ SETTINGS: export/import ============ */
 $('#exportBtn').onclick = ()=>{
-  const blob = new Blob([JSON.stringify({projects, socialPosts, financeEntries, exportedAt:new Date().toISOString()}, null, 2)], {type:'application/json'});
+  const blob = new Blob([JSON.stringify({projects, socialPosts, financeEntries, debts, savingsGoals, exportedAt:new Date().toISOString()}, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = 'canopy-backup.json'; a.click();
   URL.revokeObjectURL(url);
@@ -2445,6 +3099,8 @@ $('#importFile').onchange = (e)=>{
       if(Array.isArray(data.projects)){ projects = data.projects; saveProjects(); }
       if(Array.isArray(data.socialPosts)){ socialPosts = data.socialPosts; saveSocial(); }
       if(Array.isArray(data.financeEntries)){ financeEntries = data.financeEntries; saveFinance(); }
+      if(Array.isArray(data.debts)){ debts = data.debts; saveDebts(); }
+      if(Array.isArray(data.savingsGoals)){ savingsGoals = data.savingsGoals; saveSavings(); }
       renderAll();
       toast('Backup restored');
     }catch(err){ toast('Could not read file'); }

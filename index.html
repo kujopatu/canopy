@@ -19,6 +19,19 @@
       document.head.appendChild(s2);
     };
     document.head.appendChild(s);"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/supabase-js/2.45.4/umd/supabase.min.js"
+  onload="window.__sbLoaded && window.__sbLoaded()"
+  onerror="this.onerror=null;
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+    s.onload=function(){ window.__sbLoaded && window.__sbLoaded(); };
+    s.onerror=function(){
+      var s2=document.createElement('script');
+      s2.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js';
+      s2.onload=function(){ window.__sbLoaded && window.__sbLoaded(); };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);"></script>
 <style>
 /* ============ TOKENS ============ */
 :root{
@@ -1230,9 +1243,12 @@ function loginSuccess(){
   refreshUserChrome();
   syncNotifToggle();
   renderAll();
+  initCloudSync();
 }
 
 function doLogout(){
+  teardownRealtime();
+  sbClient = null; sbClientKey = null;
   currentUser = null;
   projects = []; socialPosts = []; financeEntries = []; debts = []; savingsGoals = [];
   vaultUnlockedKey = null; vaultEntries = [];
@@ -1402,7 +1418,11 @@ function loadProjects(){
   }
   return [];
 }
-function saveProjects(){ localStorage.setItem(userKey('canopy_projects'), JSON.stringify(projects)); maybeAutoSync(); }
+function saveProjects(){
+  let prev=[]; try{ prev = JSON.parse(localStorage.getItem(userKey('canopy_projects')))||[]; }catch(e){}
+  projects = stampChanged(projects, prev);
+  localStorage.setItem(userKey('canopy_projects'), JSON.stringify(projects)); maybeAutoSync();
+}
 
 const STAGE_LABEL = {seed:'Seed', sprout:'Sprout', bloom:'Bloom', harvest:'Harvest', dormant:'Dormant'};
 const STAGE_ORDER = ['seed','sprout','bloom','harvest','dormant'];
@@ -1430,6 +1450,7 @@ function moveToTrash(type, item){
   const trash = loadTrash();
   trash.unshift({ trashId:cryptoId(), type, item, deletedAt:new Date().toISOString() });
   saveTrash(trash);
+  cloudDeleteRowIfConnected(CLOUD_TABLE_FOR_TYPE[type], 'id', item.id);
 }
 function restoreFromTrash(trashId){
   const trash = loadTrash();
@@ -1441,11 +1462,13 @@ function restoreFromTrash(trashId){
   if(entry.type==='debt'){ debts.push(entry.item); saveDebts(); }
   if(entry.type==='saving'){ savingsGoals.push(entry.item); saveSavings(); }
   saveTrash(trash.filter(t=>t.trashId!==trashId));
+  cloudDeleteRowIfConnected('canopy_trash', 'trash_id', trashId);
   renderAll(); renderTrashPanel();
   toast('Restored 🌱');
 }
 function permanentlyDelete(trashId){
   saveTrash(loadTrash().filter(t=>t.trashId!==trashId));
+  cloudDeleteRowIfConnected('canopy_trash', 'trash_id', trashId);
   renderTrashPanel();
 }
 function renderTrashPanel(){
@@ -1465,116 +1488,244 @@ function renderTrashPanel(){
 }
 
 /* ============ CLOUD SYNC (optional, user's own Supabase project) ============
-   Uses real Supabase Auth (email + password) rather than a shared secret.
-   Each browser "device account" signs in to its own Supabase user, and
-   Postgres Row Level Security scopes every row to auth.uid() — so even
-   though the anon key is public-ish, nobody can read or write another
-   person's row without their actual password. localStorage stays the
-   source of truth on every device; cloud is purely an optional mirror. */
+   Real Supabase Auth (email + password) + Postgres Row Level Security scoped
+   to auth.uid() — only you can read/write your rows, no shared secret needed.
+   Data lives in per-type tables (one row per project/post/entry/etc, keyed by
+   its own id) instead of one JSON blob, so two devices editing different
+   items never clobber each other — conflicts are resolved per row using each
+   row's own updatedAt, and Supabase Realtime pushes changes to other open
+   devices automatically. localStorage stays the source of truth on every
+   device; cloud is purely an optional mirror. */
 function syncConfigKey(){ return userKey('canopy_sync_config'); }
 function loadSyncConfig(){ try{ return JSON.parse(localStorage.getItem(syncConfigKey()))||{}; }catch(e){ return {}; } }
 function saveSyncConfig(cfg){ localStorage.setItem(syncConfigKey(), JSON.stringify(cfg)); }
 function syncConfigured(cfg){ return !!(cfg.url && cfg.anonKey); }
-function syncSignedIn(cfg){ return !!(cfg.accessToken && cfg.refreshToken && cfg.userId); }
 
-async function authRequest(cfg, pathWithQuery, body){
-  const res = await fetch(cfg.url.replace(/\/$/,'') + '/auth/v1/' + pathWithQuery, {
-    method:'POST',
-    headers:{ 'apikey': cfg.anonKey, 'Content-Type':'application/json' },
-    body: JSON.stringify(body)
+/* ---------- per-item change stamping (drives row-level conflict resolution) ---------- */
+function stampChanged(newArr, prevArr){
+  const strip = x=>{ const c={...x}; delete c.updatedAt; return JSON.stringify(c); };
+  const prevMap = new Map((prevArr||[]).map(x=>[String(x.id), x]));
+  return (newArr||[]).map(item=>{
+    const prev = prevMap.get(String(item.id));
+    if(prev && strip(prev)===strip(item)) return prev; // unchanged — keep its existing timestamp
+    return { ...item, updatedAt:new Date().toISOString() };
   });
-  const data = await res.json().catch(()=>({}));
-  if(!res.ok) throw new Error(data.error_description || data.msg || data.error || ('Auth request failed ('+res.status+')'));
-  return data;
 }
-async function ensureFreshToken(cfg){
-  if(cfg.expiresAt && Date.now() < cfg.expiresAt - 60000) return cfg; // still valid (60s buffer)
-  const data = await authRequest(cfg, 'token?grant_type=refresh_token', { refresh_token: cfg.refreshToken });
-  cfg.accessToken = data.access_token;
-  cfg.refreshToken = data.refresh_token || cfg.refreshToken;
-  cfg.expiresAt = Date.now() + (data.expires_in||3600)*1000;
-  saveSyncConfig(cfg);
-  return cfg;
+
+/* ---------- supabase-js client (recreated per local device-account) ---------- */
+let sbClient = null, sbClientKey = null;
+function getSbClient(cfg){
+  if(typeof window.supabase === 'undefined' || !cfg.url || !cfg.anonKey) return null;
+  const key = cfg.url+'|'+cfg.anonKey+'|'+(currentUser?currentUser.username:'');
+  if(sbClient && sbClientKey===key) return sbClient;
+  teardownRealtime();
+  const storagePrefix = 'canopy_sb_'+(currentUser?currentUser.username:'anon')+'_';
+  sbClient = window.supabase.createClient(cfg.url, cfg.anonKey, {
+    auth: {
+      persistSession:true, autoRefreshToken:true, detectSessionInUrl:false,
+      storage: {
+        getItem:(k)=>localStorage.getItem(storagePrefix+k),
+        setItem:(k,v)=>localStorage.setItem(storagePrefix+k,v),
+        removeItem:(k)=>localStorage.removeItem(storagePrefix+k),
+      }
+    }
+  });
+  sbClientKey = key;
+  return sbClient;
 }
 async function signUpCloud(url, anonKey, email, password){
-  const data = await authRequest({url,anonKey}, 'signup', { email, password });
-  if(!data.access_token) return { needsConfirmation:true }; // project has email confirmation on
-  saveSyncConfig({ url, anonKey, email, userId:data.user.id, accessToken:data.access_token, refreshToken:data.refresh_token, expiresAt:Date.now()+(data.expires_in||3600)*1000, autoSync:false, lastSyncedAt:null });
+  const client = getSbClient({url,anonKey});
+  if(!client) throw new Error('Cloud library still loading — try again in a moment');
+  const { data, error } = await client.auth.signUp({ email, password });
+  if(error) throw new Error(error.message);
+  if(!data.session) return { needsConfirmation:true }; // project has email confirmation on
+  saveSyncConfig({ url, anonKey, email, userId:data.user.id, autoSync:false, lastSyncedAt:null });
+  await initCloudSync();
   return { ok:true };
 }
 async function signInCloud(url, anonKey, email, password){
-  const data = await authRequest({url,anonKey}, 'token?grant_type=password', { email, password });
-  saveSyncConfig({ url, anonKey, email, userId:data.user.id, accessToken:data.access_token, refreshToken:data.refresh_token, expiresAt:Date.now()+(data.expires_in||3600)*1000, autoSync:false, lastSyncedAt:null });
+  const client = getSbClient({url,anonKey});
+  if(!client) throw new Error('Cloud library still loading — try again in a moment');
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
+  if(error) throw new Error(error.message);
+  saveSyncConfig({ url, anonKey, email, userId:data.user.id, autoSync:false, lastSyncedAt:null });
+  await initCloudSync();
 }
-async function supabaseRequest(cfg, method, path, body){
-  const headers = { 'apikey': cfg.anonKey, 'Authorization':'Bearer '+cfg.accessToken, 'Content-Type':'application/json' };
-  if(method==='POST') headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
-  const res = await fetch(cfg.url.replace(/\/$/,'') + '/rest/v1/' + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  if(!res.ok){ const t = await res.text().catch(()=>res.statusText); throw new Error(t || res.statusText); }
-  const text = await res.text();
-  return text ? JSON.parse(text) : [];
+async function signOutCloud(){
+  const cfg = loadSyncConfig();
+  const client = getSbClient(cfg);
+  teardownRealtime();
+  if(client){ try{ await client.auth.signOut(); }catch(e){} }
+  saveSyncConfig({ url:cfg.url, anonKey:cfg.anonKey });
 }
+
+/* ---------- per-row upsert / delete against the type-specific tables ---------- */
+const CLOUD_TABLE_FOR_TYPE = { project:'canopy_projects', social:'canopy_social', finance:'canopy_finance', debt:'canopy_debts', saving:'canopy_savings' };
+async function cloudUpsertArray(client, uid, table, arr){
+  if(!arr || !arr.length) return;
+  const rows = arr.map(item=>({ id:String(item.id), owner_id:uid, data:item, updated_at:item.updatedAt || new Date().toISOString() }));
+  const { error } = await client.from(table).upsert(rows, { onConflict:'id' });
+  if(error) throw error;
+}
+function cloudDeleteRowIfConnected(table, idField, idVal){
+  if(!table) return;
+  const cfg = loadSyncConfig();
+  if(!syncConfigured(cfg)) return;
+  const client = getSbClient(cfg);
+  if(!client) return;
+  client.from(table).delete().eq(idField, String(idVal)).then(({error})=>{ if(error) console.error('cloud delete failed', table, idVal, error); });
+}
+
+/* ---------- push: upsert current state; deletions are pushed explicitly at the point of deletion ---------- */
 async function pushToCloud(silent){
-  let cfg = loadSyncConfig();
-  if(!syncConfigured(cfg) || !syncSignedIn(cfg)) return;
+  const cfg = loadSyncConfig();
+  if(!syncConfigured(cfg)) return;
+  const client = getSbClient(cfg);
+  if(!client){ if(!silent) toast('Cloud library still loading — try again in a moment'); return; }
+  const { data:{ session } } = await client.auth.getSession();
+  if(!session) return;
   try{
-    cfg = await ensureFreshToken(cfg);
-    const payload = { projects, socialPosts, financeEntries, debts, savingsGoals, trash: loadTrash() };
-    // user_id is intentionally omitted — Postgres fills it via `default auth.uid()`,
-    // so this device can never write into someone else's row even if it tried.
-    await supabaseRequest(cfg, 'POST', 'canopy_data?on_conflict=user_id', [{ payload, updated_at:new Date().toISOString() }]);
-    cfg.lastSyncedAt = new Date().toISOString();
-    saveSyncConfig(cfg);
+    const uid = session.user.id;
+    await cloudUpsertArray(client, uid, 'canopy_projects', projects);
+    await cloudUpsertArray(client, uid, 'canopy_social', socialPosts);
+    await cloudUpsertArray(client, uid, 'canopy_finance', financeEntries);
+    await cloudUpsertArray(client, uid, 'canopy_debts', debts);
+    await cloudUpsertArray(client, uid, 'canopy_savings', savingsGoals);
+    const trashRows = loadTrash();
+    if(trashRows.length){
+      const rows = trashRows.map(t=>({ trash_id:t.trashId, owner_id:uid, type:t.type, item:t.item, deleted_at:t.deletedAt, updated_at:new Date().toISOString() }));
+      const { error } = await client.from('canopy_trash').upsert(rows, { onConflict:'trash_id' });
+      if(error) throw error;
+    }
+    const cfg2 = loadSyncConfig(); cfg2.lastSyncedAt = new Date().toISOString(); saveSyncConfig(cfg2);
     if(!silent) toast('Pushed to cloud ☁️');
     if($('#syncArea')) renderSyncArea();
-  }catch(e){ if(!silent) toast('Push failed: '+e.message); else console.error('Auto-sync push failed', e); }
+  }catch(e){ if(!silent) toast('Push failed: '+(e.message||e)); else console.error('Auto-sync push failed', e); }
 }
-async function pullFromCloud(){
-  let cfg = loadSyncConfig();
-  if(!syncConfigured(cfg) || !syncSignedIn(cfg)){ toast('Sign in to cloud sync first'); return; }
+
+/* ---------- pull: MERGE (never blindly overwrites), per-row last-write-wins by updatedAt ---------- */
+function mergeArrays(local, remoteRows, remoteTrashIds){
+  const remoteMap = new Map((remoteRows||[]).map(r=>[String(r.id), { ...r.data, updatedAt: r.data.updatedAt || r.updated_at }]));
+  const localMap = new Map((local||[]).map(x=>[String(x.id), x]));
+  const ids = new Set([...remoteMap.keys(), ...localMap.keys()]);
+  const merged = [];
+  ids.forEach(id=>{
+    const l = localMap.get(id), r = remoteMap.get(id);
+    if(l && r){
+      const lt = new Date(l.updatedAt||0).getTime(), rt = new Date(r.updatedAt||0).getTime();
+      merged.push(rt >= lt ? r : l);
+    } else if(r){
+      merged.push(r);
+    } else if(l){
+      if(remoteTrashIds && remoteTrashIds.has(id)) return; // deleted on another device — drop, don't resurrect
+      merged.push(l); // exists only locally (not pushed yet) — keep it
+    }
+  });
+  return merged;
+}
+async function pullFromCloud(silent){
+  const cfg = loadSyncConfig();
+  if(!syncConfigured(cfg)){ if(!silent) toast('Set up cloud sync first'); return; }
+  const client = getSbClient(cfg);
+  if(!client){ if(!silent) toast('Cloud library still loading — try again in a moment'); return; }
+  const { data:{ session } } = await client.auth.getSession();
+  if(!session){ if(!silent) toast('Sign in to cloud sync first'); return; }
   try{
-    cfg = await ensureFreshToken(cfg);
-    const rows = await supabaseRequest(cfg, 'GET', 'canopy_data?select=payload,updated_at', null);
-    if(!rows.length){ toast('No cloud data found yet — try Push first'); return; }
-    const payload = rows[0].payload || {};
-    projects = payload.projects || [];
-    socialPosts = payload.socialPosts || [];
-    financeEntries = payload.financeEntries || [];
-    debts = payload.debts || [];
-    savingsGoals = payload.savingsGoals || [];
+    const [pRes,sRes,fRes,dRes,gRes,tRes] = await Promise.all([
+      client.from('canopy_projects').select('id,data,updated_at'),
+      client.from('canopy_social').select('id,data,updated_at'),
+      client.from('canopy_finance').select('id,data,updated_at'),
+      client.from('canopy_debts').select('id,data,updated_at'),
+      client.from('canopy_savings').select('id,data,updated_at'),
+      client.from('canopy_trash').select('trash_id,type,item,deleted_at'),
+    ]);
+    const firstErr = [pRes,sRes,fRes,dRes,gRes,tRes].map(r=>r.error).find(Boolean);
+    if(firstErr) throw firstErr;
+
+    const remoteTrashIds = new Set((tRes.data||[]).map(t=> String(t.item && t.item.id)));
+    projects = mergeArrays(projects, pRes.data, remoteTrashIds);
+    socialPosts = mergeArrays(socialPosts, sRes.data, remoteTrashIds);
+    financeEntries = mergeArrays(financeEntries, fRes.data, remoteTrashIds);
+    debts = mergeArrays(debts, dRes.data, remoteTrashIds);
+    savingsGoals = mergeArrays(savingsGoals, gRes.data, remoteTrashIds);
+
+    const localTrashMap = new Map(loadTrash().map(t=>[t.trashId,t]));
+    (tRes.data||[]).forEach(t=>{
+      if(!localTrashMap.has(t.trash_id)) localTrashMap.set(t.trash_id, { trashId:t.trash_id, type:t.type, item:t.item, deletedAt:t.deleted_at });
+    });
+    const mergedTrash = Array.from(localTrashMap.values());
+
     localStorage.setItem(userKey('canopy_projects'), JSON.stringify(projects));
     localStorage.setItem(userKey('canopy_social'), JSON.stringify(socialPosts));
     localStorage.setItem(userKey('canopy_finance'), JSON.stringify(financeEntries));
     localStorage.setItem(userKey('canopy_debts'), JSON.stringify(debts));
     localStorage.setItem(userKey('canopy_savings'), JSON.stringify(savingsGoals));
-    localStorage.setItem(userKey('canopy_trash'), JSON.stringify(payload.trash || []));
-    cfg.lastSyncedAt = new Date().toISOString();
-    saveSyncConfig(cfg);
+    localStorage.setItem(userKey('canopy_trash'), JSON.stringify(mergedTrash));
+
+    const cfg2 = loadSyncConfig(); cfg2.lastSyncedAt = new Date().toISOString(); saveSyncConfig(cfg2);
     renderAll();
     if($('#trashPanel')) renderTrashPanel();
-    toast('Pulled from cloud ☁️');
-    renderSyncArea();
-  }catch(e){ toast('Pull failed: '+e.message); }
+    if(!silent) toast('Synced with cloud ☁️');
+    if($('#syncArea')) renderSyncArea();
+  }catch(e){ if(!silent) toast('Sync failed: '+(e.message||e)); else console.error('Sync pull failed', e); }
 }
+
+/* ---------- auto-push (debounced after local edits) ---------- */
 let autoSyncTimer;
 function maybeAutoSync(){
   const cfg = loadSyncConfig();
-  if(!currentUser || !cfg.autoSync || !syncConfigured(cfg) || !syncSignedIn(cfg)) return;
+  if(!currentUser || !cfg.autoSync || !syncConfigured(cfg) || !cfg.userId) return;
   clearTimeout(autoSyncTimer);
   autoSyncTimer = setTimeout(()=> pushToCloud(true), 2000);
 }
+
+/* ---------- realtime: another device's push auto-merges in here within ~1s ---------- */
+let realtimeChannel = null, realtimePullTimer;
+function teardownRealtime(){ if(sbClient && realtimeChannel){ sbClient.removeChannel(realtimeChannel); } realtimeChannel = null; }
+function setupRealtime(client, uid){
+  teardownRealtime();
+  realtimeChannel = client.channel('canopy-rt-'+uid);
+  ['canopy_projects','canopy_social','canopy_finance','canopy_debts','canopy_savings','canopy_trash'].forEach(table=>{
+    realtimeChannel.on('postgres_changes', { event:'*', schema:'public', table, filter:`owner_id=eq.${uid}` }, ()=>{
+      clearTimeout(realtimePullTimer);
+      realtimePullTimer = setTimeout(()=> pullFromCloud(true), 600);
+    });
+  });
+  realtimeChannel.subscribe();
+}
+
+/* ---------- called after local login, and once supabase-js finishes loading ---------- */
+async function initCloudSync(){
+  const cfg = loadSyncConfig();
+  if(!currentUser || !syncConfigured(cfg)) return;
+  const client = getSbClient(cfg);
+  if(!client) return; // library not loaded yet — __sbLoaded will retry
+  const { data:{ session } } = await client.auth.getSession();
+  if(session){
+    cfg.userId = session.user.id; cfg.email = session.user.email;
+    saveSyncConfig(cfg);
+    setupRealtime(client, session.user.id);
+    pullFromCloud(true);
+  } else if(cfg.userId){
+    cfg.userId = null; saveSyncConfig(cfg); // session expired/signed out elsewhere
+  }
+  if($('#syncArea')) renderSyncArea();
+}
+window.__sbLoaded = function(){ initCloudSync(); };
+
+/* ---------- settings UI ---------- */
 let syncAuthMode = 'signin'; // 'signin' | 'signup'
 function renderSyncArea(){
   const el = $('#syncArea'); if(!el) return;
   const cfg = loadSyncConfig();
   const configured = syncConfigured(cfg);
-  const signedIn = syncSignedIn(cfg);
+  const signedIn = !!cfg.userId;
 
   if(!configured){
     el.innerHTML = `
       <div class="vault-warn" style="margin-bottom:16px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
-        <div>This uses your own free Supabase project — Canopy doesn't host anything itself. Run the SQL below once, then paste your Project URL and anon public key here. You'll sign in with an email + password next, and only you will ever be able to read or write your row.</div>
+        <div>This uses your own free Supabase project — Canopy doesn't host anything itself. Run the SQL below once, then paste your Project URL and anon public key here. You'll sign in with an email + password next, and only you will ever be able to read or write your rows.</div>
       </div>
       <div class="form-row2">
         <div class="field"><label>Supabase Project URL</label><input type="text" id="sync-url" placeholder="https://xxxx.supabase.co" value="${escapeHtml(cfg.url||'')}"></div>
@@ -1583,15 +1734,30 @@ function renderSyncArea(){
       <button class="btn btn-primary" id="saveSyncProjectBtn" style="margin-top:12px;">Continue</button>
       <details style="margin-top:16px;">
         <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--accent);">One-time SQL setup (run in Supabase SQL editor)</summary>
-        <pre style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:.74rem; overflow-x:auto; margin-top:10px; font-family:var(--font-mono); white-space:pre-wrap;">create table canopy_data (
-  user_id uuid primary key references auth.users(id) default auth.uid(),
-  payload jsonb not null default '{}'::jsonb,
-  updated_at timestamptz default now()
-);
-alter table canopy_data enable row level security;
-create policy "individuals manage own row" on canopy_data
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);</pre>
-        <div style="font-size:.74rem; color:var(--text-faint); margin-top:6px;">Every row is locked to its owner's auth.uid() — the anon key alone can't read or write anyone's data. Also turn on email/password sign-ups under Authentication → Providers if it isn't already.</div>
+        <pre style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:.74rem; overflow-x:auto; margin-top:10px; font-family:var(--font-mono); white-space:pre-wrap;">create table canopy_projects ( id text primary key, owner_id uuid not null default auth.uid() references auth.users(id), data jsonb not null, updated_at timestamptz not null default now() );
+create table canopy_social   ( id text primary key, owner_id uuid not null default auth.uid() references auth.users(id), data jsonb not null, updated_at timestamptz not null default now() );
+create table canopy_finance  ( id text primary key, owner_id uuid not null default auth.uid() references auth.users(id), data jsonb not null, updated_at timestamptz not null default now() );
+create table canopy_debts    ( id text primary key, owner_id uuid not null default auth.uid() references auth.users(id), data jsonb not null, updated_at timestamptz not null default now() );
+create table canopy_savings  ( id text primary key, owner_id uuid not null default auth.uid() references auth.users(id), data jsonb not null, updated_at timestamptz not null default now() );
+create table canopy_trash    ( trash_id text primary key, owner_id uuid not null default auth.uid() references auth.users(id), type text not null, item jsonb not null, deleted_at timestamptz not null, updated_at timestamptz not null default now() );
+
+alter table canopy_projects enable row level security;
+alter table canopy_social   enable row level security;
+alter table canopy_finance  enable row level security;
+alter table canopy_debts    enable row level security;
+alter table canopy_savings  enable row level security;
+alter table canopy_trash    enable row level security;
+
+create policy "own rows" on canopy_projects for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+create policy "own rows" on canopy_social   for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+create policy "own rows" on canopy_finance  for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+create policy "own rows" on canopy_debts    for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+create policy "own rows" on canopy_savings  for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+create policy "own rows" on canopy_trash    for all using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
+
+-- lets other signed-in devices hear about your changes instantly:
+alter publication supabase_realtime add table canopy_projects, canopy_social, canopy_finance, canopy_debts, canopy_savings, canopy_trash;</pre>
+        <div style="font-size:.74rem; color:var(--text-faint); margin-top:6px;">Every row is locked to its owner's auth.uid() — the anon key alone can't read or write anyone's data. Each item lives in its own row, so two devices editing different items never overwrite each other. Also turn on email/password sign-ups under Authentication → Providers if it isn't already.</div>
       </details>
     `;
     $('#saveSyncProjectBtn').onclick = ()=>{
@@ -1646,14 +1812,18 @@ create policy "individuals manage own row" on canopy_data
 
   el.innerHTML = `
       <div class="settings-row">
-        <div><div class="t">Signed in</div><div class="d">${escapeHtml(cfg.email)} · own row, protected by Row Level Security</div></div>
+        <div><div class="t">Signed in</div><div class="d">${escapeHtml(cfg.email)} · own rows, protected by Row Level Security</div></div>
         <button class="btn btn-danger" id="signOutSyncBtn">Sign out</button>
+      </div>
+      <div class="settings-row">
+        <div><div class="t">Real-time</div><div class="d">Live — changes from your other signed-in devices merge in automatically</div></div>
+        <span style="width:9px; height:9px; border-radius:50%; background:var(--success); flex-shrink:0;"></span>
       </div>
       <div class="settings-row">
         <div><div class="t">Last synced</div><div class="d">${cfg.lastSyncedAt ? timeAgo(cfg.lastSyncedAt) : 'Never'}</div></div>
         <div style="display:flex; gap:8px;">
-          <button class="btn btn-ghost" id="pullSyncBtn">Pull from cloud</button>
-          <button class="btn btn-primary" id="pushSyncBtn">Push to cloud</button>
+          <button class="btn btn-ghost" id="pullSyncBtn">Sync now</button>
+          <button class="btn btn-primary" id="pushSyncBtn">Push changes</button>
         </div>
       </div>
       <div class="settings-row">
@@ -1665,11 +1835,11 @@ create policy "individuals manage own row" on canopy_data
         <button class="btn btn-danger" id="disconnectSyncBtn">Disconnect</button>
       </div>
   `;
-  $('#signOutSyncBtn').onclick = ()=>{ const {url,anonKey} = cfg; saveSyncConfig({url,anonKey}); renderSyncArea(); };
-  $('#pullSyncBtn').onclick = ()=>{ if(confirm("This overwrites this device's projects, social posts, finance, debts, savings, and trash with whatever is in the cloud. Continue?")) pullFromCloud(); };
+  $('#signOutSyncBtn').onclick = async ()=>{ await signOutCloud(); renderSyncArea(); };
+  $('#pullSyncBtn').onclick = ()=> pullFromCloud(false);
   $('#pushSyncBtn').onclick = ()=> pushToCloud(false);
   $('#autoSyncToggle').onclick = ()=>{ cfg.autoSync = !cfg.autoSync; saveSyncConfig(cfg); renderSyncArea(); };
-  $('#disconnectSyncBtn').onclick = ()=>{ if(confirm('Disconnect cloud sync? Local data stays, and the cloud copy stays too — just no longer linked.')){ localStorage.removeItem(syncConfigKey()); renderSyncArea(); } };
+  $('#disconnectSyncBtn').onclick = ()=>{ if(confirm('Disconnect cloud sync? Local data stays, and the cloud copy stays too — just no longer linked.')){ teardownRealtime(); localStorage.removeItem(syncConfigKey()); renderSyncArea(); } };
 }
 
 /* ============ THEME ============ */
@@ -2067,7 +2237,11 @@ function loadSocial(){
   }
   return [];
 }
-function saveSocial(){ localStorage.setItem(userKey('canopy_social'), JSON.stringify(socialPosts)); maybeAutoSync(); }
+function saveSocial(){
+  let prev=[]; try{ prev = JSON.parse(localStorage.getItem(userKey('canopy_social')))||[]; }catch(e){}
+  socialPosts = stampChanged(socialPosts, prev);
+  localStorage.setItem(userKey('canopy_social'), JSON.stringify(socialPosts)); maybeAutoSync();
+}
 
 function populateProjectSelects(){
   const opts = '<option value="">— none —</option>' + projects.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
@@ -2280,7 +2454,11 @@ function loadFinance(){
   }
   return [];
 }
-function saveFinance(){ localStorage.setItem(userKey('canopy_finance'), JSON.stringify(financeEntries)); maybeAutoSync(); }
+function saveFinance(){
+  let prev=[]; try{ prev = JSON.parse(localStorage.getItem(userKey('canopy_finance')))||[]; }catch(e){}
+  financeEntries = stampChanged(financeEntries, prev);
+  localStorage.setItem(userKey('canopy_finance'), JSON.stringify(financeEntries)); maybeAutoSync();
+}
 function naira(n){ return '₦' + Number(n||0).toLocaleString('en-NG'); }
 
 let financeTrendInst, financeCatInst;
@@ -2469,7 +2647,11 @@ function loadDebts(){
   try{ const raw = localStorage.getItem(userKey('canopy_debts')); if(raw) return JSON.parse(raw); }catch(e){}
   return [];
 }
-function saveDebts(){ localStorage.setItem(userKey('canopy_debts'), JSON.stringify(debts)); maybeAutoSync(); }
+function saveDebts(){
+  let prev=[]; try{ prev = JSON.parse(localStorage.getItem(userKey('canopy_debts')))||[]; }catch(e){}
+  debts = stampChanged(debts, prev);
+  localStorage.setItem(userKey('canopy_debts'), JSON.stringify(debts)); maybeAutoSync();
+}
 
 let debtChartInst;
 function renderDebts(){
@@ -2624,7 +2806,11 @@ function loadSavings(){
   try{ const raw = localStorage.getItem(userKey('canopy_savings')); if(raw) return JSON.parse(raw); }catch(e){}
   return [];
 }
-function saveSavings(){ localStorage.setItem(userKey('canopy_savings'), JSON.stringify(savingsGoals)); maybeAutoSync(); }
+function saveSavings(){
+  let prev=[]; try{ prev = JSON.parse(localStorage.getItem(userKey('canopy_savings')))||[]; }catch(e){}
+  savingsGoals = stampChanged(savingsGoals, prev);
+  localStorage.setItem(userKey('canopy_savings'), JSON.stringify(savingsGoals)); maybeAutoSync();
+}
 
 function renderSavings(){
   const active = savingsGoals.filter(g=>g.status!=='completed');

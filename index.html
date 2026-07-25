@@ -1419,7 +1419,7 @@ function toast(msg, actionLabel, actionFn){
 
 /* ============ TRASH (soft delete) ============ */
 function loadTrash(){ try{ return JSON.parse(localStorage.getItem(userKey('canopy_trash')))||[]; }catch(e){ return []; } }
-function saveTrash(t){ localStorage.setItem(userKey('canopy_trash'), JSON.stringify(t)); }
+function saveTrash(t){ localStorage.setItem(userKey('canopy_trash'), JSON.stringify(t)); maybeAutoSync(); }
 function purgeOldTrash(){
   const trash = loadTrash();
   const cutoff = Date.now() - 1000*60*60*24*30;
@@ -1464,14 +1464,50 @@ function renderTrashPanel(){
     </div>`).join('') : `<div class="empty-state" style="padding:24px;">Trash is empty.</div>`;
 }
 
-/* ============ CLOUD SYNC (optional, user's own Supabase project) ============ */
+/* ============ CLOUD SYNC (optional, user's own Supabase project) ============
+   Uses real Supabase Auth (email + password) rather than a shared secret.
+   Each browser "device account" signs in to its own Supabase user, and
+   Postgres Row Level Security scopes every row to auth.uid() — so even
+   though the anon key is public-ish, nobody can read or write another
+   person's row without their actual password. localStorage stays the
+   source of truth on every device; cloud is purely an optional mirror. */
 function syncConfigKey(){ return userKey('canopy_sync_config'); }
 function loadSyncConfig(){ try{ return JSON.parse(localStorage.getItem(syncConfigKey()))||{}; }catch(e){ return {}; } }
 function saveSyncConfig(cfg){ localStorage.setItem(syncConfigKey(), JSON.stringify(cfg)); }
-function genSyncId(){ return 'sync_' + Math.random().toString(36).slice(2,10) + Math.random().toString(36).slice(2,10); }
+function syncConfigured(cfg){ return !!(cfg.url && cfg.anonKey); }
+function syncSignedIn(cfg){ return !!(cfg.accessToken && cfg.refreshToken && cfg.userId); }
 
+async function authRequest(cfg, pathWithQuery, body){
+  const res = await fetch(cfg.url.replace(/\/$/,'') + '/auth/v1/' + pathWithQuery, {
+    method:'POST',
+    headers:{ 'apikey': cfg.anonKey, 'Content-Type':'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error_description || data.msg || data.error || ('Auth request failed ('+res.status+')'));
+  return data;
+}
+async function ensureFreshToken(cfg){
+  if(cfg.expiresAt && Date.now() < cfg.expiresAt - 60000) return cfg; // still valid (60s buffer)
+  const data = await authRequest(cfg, 'token?grant_type=refresh_token', { refresh_token: cfg.refreshToken });
+  cfg.accessToken = data.access_token;
+  cfg.refreshToken = data.refresh_token || cfg.refreshToken;
+  cfg.expiresAt = Date.now() + (data.expires_in||3600)*1000;
+  saveSyncConfig(cfg);
+  return cfg;
+}
+async function signUpCloud(url, anonKey, email, password){
+  const data = await authRequest({url,anonKey}, 'signup', { email, password });
+  if(!data.access_token) return { needsConfirmation:true }; // project has email confirmation on
+  saveSyncConfig({ url, anonKey, email, userId:data.user.id, accessToken:data.access_token, refreshToken:data.refresh_token, expiresAt:Date.now()+(data.expires_in||3600)*1000, autoSync:false, lastSyncedAt:null });
+  return { ok:true };
+}
+async function signInCloud(url, anonKey, email, password){
+  const data = await authRequest({url,anonKey}, 'token?grant_type=password', { email, password });
+  saveSyncConfig({ url, anonKey, email, userId:data.user.id, accessToken:data.access_token, refreshToken:data.refresh_token, expiresAt:Date.now()+(data.expires_in||3600)*1000, autoSync:false, lastSyncedAt:null });
+}
 async function supabaseRequest(cfg, method, path, body){
-  const headers = { 'apikey': cfg.anonKey, 'Authorization':'Bearer '+cfg.anonKey, 'Content-Type':'application/json' };
+  const headers = { 'apikey': cfg.anonKey, 'Authorization':'Bearer '+cfg.accessToken, 'Content-Type':'application/json' };
   if(method==='POST') headers['Prefer'] = 'resolution=merge-duplicates,return=representation';
   const res = await fetch(cfg.url.replace(/\/$/,'') + '/rest/v1/' + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
   if(!res.ok){ const t = await res.text().catch(()=>res.statusText); throw new Error(t || res.statusText); }
@@ -1479,11 +1515,14 @@ async function supabaseRequest(cfg, method, path, body){
   return text ? JSON.parse(text) : [];
 }
 async function pushToCloud(silent){
-  const cfg = loadSyncConfig();
-  if(!cfg.url || !cfg.anonKey || !cfg.syncId) return;
+  let cfg = loadSyncConfig();
+  if(!syncConfigured(cfg) || !syncSignedIn(cfg)) return;
   try{
-    const payload = { projects, socialPosts, financeEntries, debts, savingsGoals };
-    await supabaseRequest(cfg, 'POST', 'canopy_sync', [{ sync_id:cfg.syncId, payload, updated_at:new Date().toISOString() }]);
+    cfg = await ensureFreshToken(cfg);
+    const payload = { projects, socialPosts, financeEntries, debts, savingsGoals, trash: loadTrash() };
+    // user_id is intentionally omitted — Postgres fills it via `default auth.uid()`,
+    // so this device can never write into someone else's row even if it tried.
+    await supabaseRequest(cfg, 'POST', 'canopy_data?on_conflict=user_id', [{ payload, updated_at:new Date().toISOString() }]);
     cfg.lastSyncedAt = new Date().toISOString();
     saveSyncConfig(cfg);
     if(!silent) toast('Pushed to cloud ☁️');
@@ -1491,11 +1530,12 @@ async function pushToCloud(silent){
   }catch(e){ if(!silent) toast('Push failed: '+e.message); else console.error('Auto-sync push failed', e); }
 }
 async function pullFromCloud(){
-  const cfg = loadSyncConfig();
-  if(!cfg.url || !cfg.anonKey || !cfg.syncId){ toast('Set up cloud sync first'); return; }
+  let cfg = loadSyncConfig();
+  if(!syncConfigured(cfg) || !syncSignedIn(cfg)){ toast('Sign in to cloud sync first'); return; }
   try{
-    const rows = await supabaseRequest(cfg, 'GET', `canopy_sync?sync_id=eq.${encodeURIComponent(cfg.syncId)}&select=payload,updated_at`, null);
-    if(!rows.length){ toast('No cloud data found for this Sync ID yet — try Push first'); return; }
+    cfg = await ensureFreshToken(cfg);
+    const rows = await supabaseRequest(cfg, 'GET', 'canopy_data?select=payload,updated_at', null);
+    if(!rows.length){ toast('No cloud data found yet — try Push first'); return; }
     const payload = rows[0].payload || {};
     projects = payload.projects || [];
     socialPosts = payload.socialPosts || [];
@@ -1507,9 +1547,11 @@ async function pullFromCloud(){
     localStorage.setItem(userKey('canopy_finance'), JSON.stringify(financeEntries));
     localStorage.setItem(userKey('canopy_debts'), JSON.stringify(debts));
     localStorage.setItem(userKey('canopy_savings'), JSON.stringify(savingsGoals));
+    localStorage.setItem(userKey('canopy_trash'), JSON.stringify(payload.trash || []));
     cfg.lastSyncedAt = new Date().toISOString();
     saveSyncConfig(cfg);
     renderAll();
+    if($('#trashPanel')) renderTrashPanel();
     toast('Pulled from cloud ☁️');
     renderSyncArea();
   }catch(e){ toast('Pull failed: '+e.message); }
@@ -1517,41 +1559,95 @@ async function pullFromCloud(){
 let autoSyncTimer;
 function maybeAutoSync(){
   const cfg = loadSyncConfig();
-  if(!currentUser || !cfg.autoSync || !cfg.url || !cfg.anonKey || !cfg.syncId) return;
+  if(!currentUser || !cfg.autoSync || !syncConfigured(cfg) || !syncSignedIn(cfg)) return;
   clearTimeout(autoSyncTimer);
   autoSyncTimer = setTimeout(()=> pushToCloud(true), 2000);
 }
+let syncAuthMode = 'signin'; // 'signin' | 'signup'
 function renderSyncArea(){
   const el = $('#syncArea'); if(!el) return;
   const cfg = loadSyncConfig();
-  const enabled = !!(cfg.url && cfg.anonKey && cfg.syncId);
-  el.innerHTML = !enabled ? `
+  const configured = syncConfigured(cfg);
+  const signedIn = syncSignedIn(cfg);
+
+  if(!configured){
+    el.innerHTML = `
       <div class="vault-warn" style="margin-bottom:16px;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
-        <div>This uses your own free Supabase project — Canopy doesn't host anything itself. Create one table once (SQL below), then paste your Project URL and anon public key here. Sync is manual (Push / Pull) unless you turn on auto-push, so nothing overwrites your data without you asking.</div>
+        <div>This uses your own free Supabase project — Canopy doesn't host anything itself. Run the SQL below once, then paste your Project URL and anon public key here. You'll sign in with an email + password next, and only you will ever be able to read or write your row.</div>
       </div>
       <div class="form-row2">
         <div class="field"><label>Supabase Project URL</label><input type="text" id="sync-url" placeholder="https://xxxx.supabase.co" value="${escapeHtml(cfg.url||'')}"></div>
         <div class="field"><label>Anon public key</label><input type="text" id="sync-key" placeholder="eyJhbGciOi..." value="${escapeHtml(cfg.anonKey||'')}"></div>
       </div>
-      <div class="field" style="margin-top:10px;"><label>Sync ID <span style="font-weight:400; color:var(--text-faint);">(leave blank to create one, or paste one from another device to link them)</span></label><input type="text" id="sync-id" placeholder="auto-generated if left blank" value="${escapeHtml(cfg.syncId||'')}"></div>
-      <button class="btn btn-primary" id="enableSyncBtn" style="margin-top:12px;">Enable cloud sync</button>
+      <button class="btn btn-primary" id="saveSyncProjectBtn" style="margin-top:12px;">Continue</button>
       <details style="margin-top:16px;">
         <summary style="cursor:pointer; font-size:.82rem; font-weight:700; color:var(--accent);">One-time SQL setup (run in Supabase SQL editor)</summary>
-        <pre style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:.74rem; overflow-x:auto; margin-top:10px; font-family:var(--font-mono); white-space:pre-wrap;">create table canopy_sync (
-  sync_id text primary key,
-  payload jsonb not null,
+        <pre style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:.74rem; overflow-x:auto; margin-top:10px; font-family:var(--font-mono); white-space:pre-wrap;">create table canopy_data (
+  user_id uuid primary key references auth.users(id) default auth.uid(),
+  payload jsonb not null default '{}'::jsonb,
   updated_at timestamptz default now()
 );
-alter table canopy_sync enable row level security;
-create policy "canopy sync anon access" on canopy_sync
-  for all using (true) with check (true);</pre>
-        <div style="font-size:.74rem; color:var(--text-faint); margin-top:6px;">This policy lets anyone with your anon key and Sync ID read/write that one row — fine for personal use, but don't share your Sync ID publicly.</div>
+alter table canopy_data enable row level security;
+create policy "individuals manage own row" on canopy_data
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);</pre>
+        <div style="font-size:.74rem; color:var(--text-faint); margin-top:6px;">Every row is locked to its owner's auth.uid() — the anon key alone can't read or write anyone's data. Also turn on email/password sign-ups under Authentication → Providers if it isn't already.</div>
       </details>
-  ` : `
+    `;
+    $('#saveSyncProjectBtn').onclick = ()=>{
+      const url = $('#sync-url').value.trim();
+      const anonKey = $('#sync-key').value.trim();
+      if(!url || !anonKey){ toast('Enter both the Project URL and anon key'); return; }
+      saveSyncConfig({ url, anonKey });
+      renderSyncArea();
+    };
+    return;
+  }
+
+  if(!signedIn){
+    el.innerHTML = `
+      <div class="auth-tabs" style="margin-bottom:14px;">
+        <button class="${syncAuthMode==='signin'?'active':''}" id="syncTabSignin">Sign in</button>
+        <button class="${syncAuthMode==='signup'?'active':''}" id="syncTabSignup">Create cloud account</button>
+      </div>
+      <form class="auth-form" id="syncAuthForm">
+        <div class="field"><input type="email" id="sync-email" placeholder="Email" required value="${escapeHtml(cfg.email||'')}"></div>
+        <div class="field"><input type="password" id="sync-pass" placeholder="Password (min 6 characters)" required minlength="6"></div>
+        <div id="sync-auth-error" class="auth-error" style="display:none;"></div>
+        <button class="btn btn-primary" type="submit" style="justify-content:center;">${syncAuthMode==='signin'?'Sign in':'Create account & enable sync'}</button>
+      </form>
+      <div class="settings-row" style="margin-top:12px;">
+        <div><div class="t">Project</div><div class="d">${escapeHtml(cfg.url)}</div></div>
+        <button class="btn btn-ghost" id="changeSyncProjectBtn">Change</button>
+      </div>
+    `;
+    $('#syncTabSignin').onclick = ()=>{ syncAuthMode='signin'; renderSyncArea(); };
+    $('#syncTabSignup').onclick = ()=>{ syncAuthMode='signup'; renderSyncArea(); };
+    $('#changeSyncProjectBtn').onclick = ()=>{ localStorage.removeItem(syncConfigKey()); renderSyncArea(); };
+    $('#syncAuthForm').onsubmit = async (e)=>{
+      e.preventDefault();
+      const email = $('#sync-email').value.trim();
+      const password = $('#sync-pass').value;
+      const errEl = $('#sync-auth-error'); errEl.style.display='none';
+      try{
+        if(syncAuthMode==='signup'){
+          const result = await signUpCloud(cfg.url, cfg.anonKey, email, password);
+          if(result.needsConfirmation){ toast('Check your email to confirm your account, then sign in'); syncAuthMode='signin'; renderSyncArea(); return; }
+          toast('Cloud account created — synced ☁️');
+        } else {
+          await signInCloud(cfg.url, cfg.anonKey, email, password);
+          toast('Signed in — cloud sync ready ☁️');
+        }
+        renderSyncArea();
+      }catch(err){ errEl.textContent = err.message; errEl.style.display='block'; }
+    };
+    return;
+  }
+
+  el.innerHTML = `
       <div class="settings-row">
-        <div><div class="t">Status</div><div class="d">Connected · Sync ID: <code style="font-family:var(--font-mono);">${escapeHtml(cfg.syncId)}</code></div></div>
-        <button class="icon-btn" id="copySyncIdBtn" title="Copy Sync ID"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <div><div class="t">Signed in</div><div class="d">${escapeHtml(cfg.email)} · own row, protected by Row Level Security</div></div>
+        <button class="btn btn-danger" id="signOutSyncBtn">Sign out</button>
       </div>
       <div class="settings-row">
         <div><div class="t">Last synced</div><div class="d">${cfg.lastSyncedAt ? timeAgo(cfg.lastSyncedAt) : 'Never'}</div></div>
@@ -1561,31 +1657,19 @@ create policy "canopy sync anon access" on canopy_sync
         </div>
       </div>
       <div class="settings-row">
-        <div><div class="t">Auto-push after changes</div><div class="d">Silently pushes ~2s after any edit</div></div>
+        <div><div class="t">Auto-push after changes</div><div class="d">Silently pushes ~2s after any edit (projects, social, finance, debts, savings, trash)</div></div>
         <button class="toggle-switch ${cfg.autoSync?'on':''}" id="autoSyncToggle"></button>
       </div>
       <div class="settings-row">
-        <div><div class="t">Disconnect</div><div class="d">Stops syncing this account — cloud data stays intact</div></div>
+        <div><div class="t">Forget this project</div><div class="d">Removes the saved URL/key/session from this device — cloud data stays intact</div></div>
         <button class="btn btn-danger" id="disconnectSyncBtn">Disconnect</button>
       </div>
   `;
-  if(!enabled){
-    $('#enableSyncBtn').onclick = ()=>{
-      const url = $('#sync-url').value.trim();
-      const anonKey = $('#sync-key').value.trim();
-      const syncId = $('#sync-id').value.trim() || genSyncId();
-      if(!url || !anonKey){ toast('Enter both the Project URL and anon key'); return; }
-      saveSyncConfig({ url, anonKey, syncId, autoSync:false, lastSyncedAt:null });
-      toast('Cloud sync connected — try Push or Pull below');
-      renderSyncArea();
-    };
-  } else {
-    $('#copySyncIdBtn').onclick = ()=>{ navigator.clipboard?.writeText(cfg.syncId).then(()=>toast('Sync ID copied')); };
-    $('#pullSyncBtn').onclick = ()=>{ if(confirm("This overwrites this device's projects, social posts, and finance data with whatever is in the cloud. Continue?")) pullFromCloud(); };
-    $('#pushSyncBtn').onclick = ()=> pushToCloud(false);
-    $('#autoSyncToggle').onclick = ()=>{ cfg.autoSync = !cfg.autoSync; saveSyncConfig(cfg); renderSyncArea(); };
-    $('#disconnectSyncBtn').onclick = ()=>{ if(confirm('Disconnect cloud sync? Local data stays, and the cloud copy stays too — just no longer linked.')){ localStorage.removeItem(syncConfigKey()); renderSyncArea(); } };
-  }
+  $('#signOutSyncBtn').onclick = ()=>{ const {url,anonKey} = cfg; saveSyncConfig({url,anonKey}); renderSyncArea(); };
+  $('#pullSyncBtn').onclick = ()=>{ if(confirm("This overwrites this device's projects, social posts, finance, debts, savings, and trash with whatever is in the cloud. Continue?")) pullFromCloud(); };
+  $('#pushSyncBtn').onclick = ()=> pushToCloud(false);
+  $('#autoSyncToggle').onclick = ()=>{ cfg.autoSync = !cfg.autoSync; saveSyncConfig(cfg); renderSyncArea(); };
+  $('#disconnectSyncBtn').onclick = ()=>{ if(confirm('Disconnect cloud sync? Local data stays, and the cloud copy stays too — just no longer linked.')){ localStorage.removeItem(syncConfigKey()); renderSyncArea(); } };
 }
 
 /* ============ THEME ============ */

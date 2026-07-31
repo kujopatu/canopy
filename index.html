@@ -32,6 +32,19 @@
       document.head.appendChild(s2);
     };
     document.head.appendChild(s);"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+  onload="window.__xlsxLoaded && window.__xlsxLoaded()"
+  onerror="this.onerror=null;
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload=function(){ window.__xlsxLoaded && window.__xlsxLoaded(); };
+    s.onerror=function(){
+      var s2=document.createElement('script');
+      s2.src='https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js';
+      s2.onload=function(){ window.__xlsxLoaded && window.__xlsxLoaded(); };
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);"></script>
 <style>
 /* ============ TOKENS ============ */
 :root{
@@ -598,10 +611,15 @@ html[data-mode="dark"] .badge-goal-active{ background:#152c38; color:#8fd1ea;}
       <div class="topbar">
         <div><div class="page-title">Social Media</div><div class="page-desc">NaijaToday, Big Picture Supply Chain, and everything you post — planned in one place.</div></div>
         <div class="topbar-actions">
+          <button class="btn btn-ghost" id="loadArticleScheduleBtn">Load 4-week article plan</button>
+          <button class="btn btn-ghost" id="downloadArticleTemplateBtn">Download Excel template</button>
+          <label class="btn btn-ghost" style="cursor:pointer;">Import from Excel<input type="file" id="articleExcelInput" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+          <button class="btn btn-ghost" id="exportArticlesExcelBtn">Export to Excel</button>
           <button class="btn btn-primary" id="addSocialBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add post</button>
         </div>
       </div>
       <div class="stat-grid" id="socialStatGrid" style="grid-template-columns:repeat(4,1fr);"></div>
+      <div class="panel" id="upcomingArticlesPanel" style="margin-bottom:16px;"></div>
       <div class="filter-row" style="justify-content:space-between; display:flex; flex-wrap:wrap; gap:10px;">
         <div class="filter-row" id="socialFilterRow" style="margin:0;"></div>
         <div class="view-toggle" id="socialViewToggle">
@@ -881,6 +899,21 @@ html[data-mode="dark"] .badge-goal-active{ background:#152c38; color:#8fd1ea;}
         </div>
         <div class="field"><label>Status</label>
           <select id="sf-status"><option value="draft">Draft</option><option value="scheduled">Scheduled</option><option value="posted">Posted</option></select>
+        </div>
+      </div>
+      <div class="form-row2">
+        <div class="field"><label>Content category</label>
+          <select id="sf-contentcat">
+            <option value="">— not an article —</option>
+            <option>Jobs & Careers</option>
+            <option>Scholarships</option>
+            <option>Business & Finance</option>
+            <option>Trending/News</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Featured image ready?</label>
+          <select id="sf-imgready"><option value="no">No</option><option value="yes">Yes</option></select>
         </div>
       </div>
       <div class="form-row2">
@@ -2275,12 +2308,154 @@ function renderSocial(){
         <span class="badge badge-${s.status}">${s.status[0].toUpperCase()+s.status.slice(1)}</span>
       </div>
       <div class="scard-title">${escapeHtml(s.title)}</div>
+      ${s.contentCategory ? `<div class="pcard-cat">${escapeHtml(s.contentCategory)}${s.imageReady?' · image ready':''}</div>` : ''}
       ${s.project ? `<div class="pcard-cat">Linked: ${escapeHtml(s.project)}</div>` : ''}
       <div class="scard-meta"><span>${s.date ? new Date(s.date).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : 'No date'}</span></div>
     </div>`).join('') : `<div class="empty-state">No posts in this view yet.</div>`;
 
   if(socialViewMode==='calendar') renderSocialCalendar();
+  renderUpcomingArticles();
 }
+
+/* ---------- upcoming articles panel ---------- */
+function renderUpcomingArticles(){
+  const el = $('#upcomingArticlesPanel'); if(!el) return;
+  const upcoming = socialPosts.filter(s=> s.contentCategory && s.status!=='posted' && s.date)
+    .slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
+  if(!upcoming.length){ el.innerHTML = ''; return; }
+  el.innerHTML = `
+    <h3 style="margin-bottom:10px;">Upcoming articles</h3>
+    <div class="attention-list">
+      ${upcoming.slice(0,6).map(s=>{
+        const days = Math.ceil((new Date(s.date)-new Date())/(1000*60*60*24));
+        const overdue = days<0;
+        const label = overdue ? `Overdue ${Math.abs(days)}d` : days===0 ? 'Due today' : `Due in ${days}d`;
+        return `<div class="attention-item">
+          <div class="dot" style="background:${overdue||days<=2?'var(--danger)':'var(--warning)'}"></div>
+          <div class="txt">${escapeHtml(s.title)}<small>${escapeHtml(s.contentCategory)} · ${label}${s.imageReady?' · image ready':''}</small></div>
+          <button class="btn btn-ghost" style="padding:6px 12px;font-size:.75rem;" onclick="openSocialModal('${s.id}')">Open</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+/* ---------- one-click 4-week article schedule loader ---------- */
+function loadArticleSchedule(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dayOfWeek = today.getDay(); // 0=Sun..6=Sat
+  const daysUntilMonday = (8 - dayOfWeek) % 7 || 7;
+  const nextMonday = new Date(today); nextMonday.setDate(today.getDate() + daysUntilMonday);
+  const offsets = {Mon:0, Wed:2, Thu:3, Sun:6};
+
+  const weeks = [
+    [{day:'Mon',cat:'Jobs & Careers',title:'How to Write a CV Nigerian Employers Actually Read in 2026'},
+     {day:'Wed',cat:'Trending/News',title:'[Trending news — pick topic closer to date]'},
+     {day:'Thu',cat:'Scholarships',title:'Chevening vs Commonwealth vs DAAD: Which Scholarship Fits You?'},
+     {day:'Sun',cat:'Business & Finance',title:'The Complete Guide to Starting a Registered Business in Nigeria'}],
+    [{day:'Mon',cat:'Jobs & Careers',title:'5 Digital Skills You Can Learn Free in 30 Days'},
+     {day:'Wed',cat:'Trending/News',title:'[Trending news — pick topic closer to date]'},
+     {day:'Thu',cat:'Jobs & Careers',title:'NYSC to First Job: What Corps Members Get Wrong'},
+     {day:'Sun',cat:'Business & Finance',title:'Naira Savings vs Dollar Savings in 2026'}],
+    [{day:'Mon',cat:'Jobs & Careers',title:'How Remote Work From Nigeria Actually Pays in 2026'},
+     {day:'Wed',cat:'Trending/News',title:'[Trending news — pick topic closer to date]'},
+     {day:'Thu',cat:'Scholarships',title:'Undergraduate Scholarships for Nigerians Nobody Talks About'},
+     {day:'Sun',cat:'Business & Finance',title:"Agritech in Nigeria: A Beginner's Guide"}],
+    [{day:'Mon',cat:'Jobs & Careers',title:'Interview Red Flags Nigerian Job Seekers Should Never Ignore'},
+     {day:'Wed',cat:'Trending/News',title:'[Trending news — pick topic closer to date]'},
+     {day:'Thu',cat:'Scholarships',title:"PhD and Master's Funding in Nigeria: PTDF, TETFund"},
+     {day:'Sun',cat:'Business & Finance',title:'Fashion and Creative Business Funding in Nigeria'}],
+  ];
+
+  let added = 0;
+  weeks.forEach((week, wi)=>{
+    week.forEach(item=>{
+      const d = new Date(nextMonday); d.setDate(nextMonday.getDate() + wi*7 + offsets[item.day]);
+      const dateStr = d.toISOString().slice(0,10);
+      if(socialPosts.some(s=> s.title===item.title && s.date===dateStr)) return; // don't duplicate on re-click
+      socialPosts.push({
+        id: cryptoId(), title:item.title, platform:'Blog', status:'draft', date:dateStr,
+        project:'NaijaToday', link:'', revenue:0, cost:0, notes:'',
+        contentCategory:item.cat, imageReady:false
+      });
+      added++;
+    });
+  });
+  saveSocial(); renderSocial();
+  toast(added ? `Loaded ${added} article slot(s) into the plan 🗓️` : 'This schedule is already loaded');
+}
+$('#loadArticleScheduleBtn').onclick = loadArticleSchedule;
+
+/* ---------- Excel template / import / export for articles ---------- */
+function xlsxReady(){
+  if(typeof XLSX === 'undefined'){ toast('Excel library still loading — try again in a moment'); return false; }
+  return true;
+}
+function downloadArticleTemplate(){
+  if(!xlsxReady()) return;
+  const rows = [
+    {Title:'How to Write a CV Nigerian Employers Actually Read in 2026', Category:'Jobs & Careers', Platform:'Blog', Status:'draft', Date:'2026-08-03', 'Image Ready':'no', Notes:''}
+  ];
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:50},{wch:20},{wch:12},{wch:12},{wch:12},{wch:13},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Articles');
+  XLSX.writeFile(wb, 'canopy-article-template.xlsx');
+}
+function exportArticlesToExcel(){
+  if(!xlsxReady()) return;
+  const rows = socialPosts.filter(s=>s.contentCategory).map(s=>({
+    Title:s.title, Category:s.contentCategory, Platform:s.platform, Status:s.status,
+    Date:s.date||'', 'Image Ready':s.imageReady?'yes':'no', Link:s.link||'', Notes:s.notes||''
+  }));
+  if(!rows.length){ toast('No articles to export yet — add one or load the 4-week plan first'); return; }
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:50},{wch:20},{wch:12},{wch:12},{wch:12},{wch:13},{wch:30},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Articles');
+  XLSX.writeFile(wb, 'canopy-articles-export.xlsx');
+  toast(`Exported ${rows.length} article(s) 📤`);
+}
+function importArticlesFromExcel(file){
+  if(!xlsxReady()) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      let added = 0;
+      rows.forEach(r=>{
+        const title = String(r.Title||r.title||'').trim();
+        if(!title) return;
+        const dateRaw = r.Date||r.date||'';
+        let dateStr = '';
+        if(dateRaw instanceof Date){ dateStr = dateRaw.toISOString().slice(0,10); }
+        else if(typeof dateRaw === 'number'){ dateStr = XLSX.SSF.parse_date_code(dateRaw) ? new Date(Date.UTC(1899,11,30)+dateRaw*86400000).toISOString().slice(0,10) : ''; }
+        else { dateStr = String(dateRaw).slice(0,10); }
+        socialPosts.push({
+          id:cryptoId(), title, platform:String(r.Platform||r.platform||'Blog'),
+          status:String(r.Status||r.status||'draft').toLowerCase(),
+          date: dateStr || null, project:'NaijaToday', link:String(r.Link||r.link||''),
+          revenue:0, cost:0, notes:String(r.Notes||r.notes||''),
+          contentCategory:String(r.Category||r.category||''),
+          imageReady: String(r['Image Ready']||r.imageReady||'').toLowerCase()==='yes'
+        });
+        added++;
+      });
+      saveSocial(); renderSocial();
+      toast(added ? `Imported ${added} article(s) 📥` : 'No valid rows found — check the "Title" column exists');
+    }catch(err){ toast('Could not read that file — try the template'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+$('#downloadArticleTemplateBtn').onclick = downloadArticleTemplate;
+$('#exportArticlesExcelBtn').onclick = exportArticlesToExcel;
+$('#articleExcelInput').onchange = (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  importArticlesFromExcel(file);
+  e.target.value = '';
+};
+window.__xlsxLoaded = function(){ /* library ready — buttons already wired, nothing else to do */ };
 
 /* ---------- social calendar ---------- */
 let socialViewMode = 'list';
@@ -2362,6 +2537,8 @@ function openSocialModal(id){
   $('#sf-revenue').value = s && s.revenue ? s.revenue : '';
   $('#sf-cost').value = s && s.cost ? s.cost : '';
   $('#sf-notes').value = s? (s.notes||'') : '';
+  $('#sf-contentcat').value = s? (s.contentCategory||'') : '';
+  $('#sf-imgready').value = s && s.imageReady ? 'yes' : 'no';
   $('#deleteSocialBtn').style.display = s ? 'inline-flex' : 'none';
   $('#socialModalBackdrop').classList.add('active');
 }
@@ -2371,7 +2548,9 @@ $('#socialForm').onsubmit = (e)=>{
   const data = { title:$('#sf-title').value.trim(), platform:$('#sf-platform').value, status:$('#sf-status').value,
     date:$('#sf-date').value||null, project:$('#sf-project').value, link:$('#sf-link').value.trim(),
     revenue: parseFloat($('#sf-revenue').value)||0, cost: parseFloat($('#sf-cost').value)||0,
-    notes:$('#sf-notes').value.trim() };
+    notes:$('#sf-notes').value.trim(),
+    contentCategory: $('#sf-contentcat').value,
+    imageReady: $('#sf-imgready').value==='yes' };
   let post;
   if(editingSocialId){
     const idx = socialPosts.findIndex(x=>x.id===editingSocialId);
@@ -3324,20 +3503,30 @@ function getReminders(){
     if(p.status==='harvest') return;
     if(p.dueDate){
       const days = Math.ceil((new Date(p.dueDate)-new Date())/(1000*60*60*24));
-      if(days<0) items.push({title:p.name, detail:`Overdue by ${Math.abs(days)} day(s)`, urgent:true, id:p.id});
-      else if(days<=3) items.push({title:p.name, detail:`Due in ${days} day(s)`, urgent:true, id:p.id});
+      if(days<0) items.push({title:p.name, detail:`Overdue by ${Math.abs(days)} day(s)`, urgent:true, id:p.id, kind:'project'});
+      else if(days<=3) items.push({title:p.name, detail:`Due in ${days} day(s)`, urgent:true, id:p.id, kind:'project'});
     }
-    if(p.paused) items.push({title:p.name, detail:'Paused — needs a decision', urgent:false, id:p.id});
+    if(p.paused) items.push({title:p.name, detail:'Paused — needs a decision', urgent:false, id:p.id, kind:'project'});
     const overdueTasks = overdueTaskCount(p);
-    if(overdueTasks) items.push({title:p.name, detail:`${overdueTasks} task${overdueTasks>1?'s':''} overdue`, urgent:true, id:p.id});
+    if(overdueTasks) items.push({title:p.name, detail:`${overdueTasks} task${overdueTasks>1?'s':''} overdue`, urgent:true, id:p.id, kind:'project'});
   });
+
+  // Article schedule reminders — anything tagged with a content category that isn't posted yet
+  socialPosts.forEach(s=>{
+    if(!s.contentCategory || s.status==='posted' || !s.date) return;
+    const days = Math.ceil((new Date(s.date)-new Date())/(1000*60*60*24));
+    if(days<0) items.push({title:s.title, detail:`Article overdue by ${Math.abs(days)} day(s) — ${s.contentCategory}`, urgent:true, id:s.id, kind:'social'});
+    else if(days<=2) items.push({title:s.title, detail:`Article due ${days===0?'today':'in '+days+' day(s)'} — ${s.contentCategory}`, urgent:true, id:s.id, kind:'social'});
+    else if(days<=5) items.push({title:s.title, detail:`Article due in ${days} days — ${s.contentCategory}`, urgent:false, id:s.id, kind:'social'});
+  });
+
   return items;
 }
 function renderReminders(){
   const items = getReminders();
   const dot = $('#bellDot'); if(dot) dot.style.display = items.length ? 'block' : 'none';
   const dd = $('#bellDropdown');
-  if(dd) dd.innerHTML = items.length ? items.map(i=>`<div class="bell-item" style="cursor:pointer;" onclick="openProjectModal('${i.id}'); $('#bellDropdown').classList.remove('open');"><div class="t">${escapeHtml(i.title)}</div><div class="d">${escapeHtml(i.detail)}</div></div>`).join('') : `<div class="bell-item"><div class="d">Nothing urgent — you're on top of it.</div></div>`;
+  if(dd) dd.innerHTML = items.length ? items.map(i=>`<div class="bell-item" style="cursor:pointer;" onclick="${i.kind==='social'?`openSocialModal('${i.id}')`:`openProjectModal('${i.id}')`}; $('#bellDropdown').classList.remove('open');"><div class="t">${escapeHtml(i.title)}</div><div class="d">${escapeHtml(i.detail)}</div></div>`).join('') : `<div class="bell-item"><div class="d">Nothing urgent — you're on top of it.</div></div>`;
   maybeFireBrowserNotifications(items);
 }
 function maybeFireBrowserNotifications(items){
